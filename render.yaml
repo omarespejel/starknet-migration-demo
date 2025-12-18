@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: starknet-migration-demo
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/out
+    envVars:
+      - key: NEXT_PUBLIC_PORTAL_ADDRESS
+        value: "0x027d9db485a394d3aea0c3af6a82b889cb95a833cc4fe36ede8696624f0310fb"
+      - key: NEXT_PUBLIC_TOKEN_ADDRESS
+        value: "0x07ef08eb2287fe9a996bb3de1e284b595fab5baae51374e0d8fc088c2d4334c9"
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=3600
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
