@@ -1,0 +1,20 @@
+{
+  "name": "migration-portal-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for merkle tree generation and validation",
+  "main": "generate_merkle.ts",
+  "scripts": {
+    "validate": "ts-node validate_leaf.ts",
+    "generate": "ts-node generate_merkle.ts"
+  },
+  "dependencies": {
+    "@starkware-industries/starkware-utils": "git+https://github.com/starkware-libs/starkware-crypto-utils.git",
+    "poseidon-lite": "^0.3.0",
+    "starknet": "^9.2.1",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  }
+}

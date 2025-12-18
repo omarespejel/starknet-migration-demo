@@ -1,0 +1,58 @@
+{
+  "output": {
+    "filePath": "context-full.xml",
+    "style": "xml",
+    "showLineNumbers": true
+  },
+  "ignore": {
+    "customPatterns": [
+      "*.lock",
+      "Scarb.lock",
+      "package-lock.json",
+      "yarn.lock",
+      "pnpm-lock.yaml",
+      "context*.xml",
+      "context-*-*.xml",
+      "node_modules/**",
+      ".git/**",
+      "__pycache__/**",
+      "*.pyc",
+      ".venv/**",
+      "venv/**",
+      ".cursor/**",
+      "*.swp",
+      "*.swo",
+      ".DS_Store",
+      ".env",
+      ".env.local",
+      ".env.*.local",
+      "target/**",
+      "contracts/target/**",
+      "contracts/dev/**",
+      ".next/**",
+      "dist/**",
+      "build/**",
+      "*.log"
+    ]
+  },
+  "include": [
+    "README.md",
+    "repomix.config.json",
+    "Makefile",
+    "snapshot.json",
+    "snapshot.example.json",
+    "snfoundry.toml",
+    "contracts/Scarb.toml",
+    "contracts/snfoundry.toml",
+    "contracts/src/**",
+    "contracts/tests/**",
+    "frontend/package.json",
+    "frontend/next.config.js",
+    "frontend/tsconfig.json",
+    "frontend/tailwind.config.ts",
+    "frontend/postcss.config.js",
+    "frontend/app/**",
+    "scripts/**",
+    "scripts/merkle_tree.json"
+  ]
+}

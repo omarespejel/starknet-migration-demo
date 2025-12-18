@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+contracts/target/
+contracts/dev/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+.next/
+dist/
+build/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Lock files (keep Scarb.lock but ignore others)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Repomix context files
+context*.xml
+context-*-*.xml
+
+# Test coverage
+coverage/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
