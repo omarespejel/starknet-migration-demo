@@ -59,7 +59,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
     
     try {
-      console.log("🔧 [INIT] Creating ControllerConnector with optimized config...");
+      console.log("🔧 [INIT] Creating ControllerConnector with fixed config...");
       // Using 'as any' to allow advanced options that may not be in type definitions
       // but are supported at runtime by Cartridge Controller
       const ctrl = new ControllerConnector({
@@ -73,15 +73,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // Session policies for gasless transactions
         policies,
         
+        // ✨ FIXED: Remove lazyload to force immediate iframe mounting
+        // lazyload: true, // ❌ REMOVED - causes initialization failures
+        
+        // ✨ FIXED: Explicitly set keychain URL
+        url: "https://x.cartridge.gg",
+        
         // ✨ Advanced options (may not be in TypeScript types but work at runtime)
         signupOptions: ["webauthn", "google"],
         theme: "dope-wars",
         redirectUrl: typeof window !== "undefined" ? window.location.origin : undefined,
-        lazyload: true,
         propagateSessionErrors: true,
       } as any);
       
       console.log("✅ [INIT] ControllerConnector created:", ctrl.id);
+      console.log("🔑 [INIT] Keychain URL: https://x.cartridge.gg");
       console.log("🔑 [INIT] Session policies configured for gasless claims");
       return ctrl;
     } catch (error) {
@@ -105,6 +111,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       .then(r => r.json())
       .then(data => console.log("✅ Cartridge RPC reachable, chain:", data.result))
       .catch(e => console.error("❌ Cartridge RPC error:", e.message));
+      
+    // ✨ NEW: Test keychain accessibility
+    fetch("https://x.cartridge.gg/health")
+      .then(r => console.log("✅ Cartridge keychain reachable:", r.status))
+      .catch(e => console.error("❌ Cartridge keychain error:", e.message));
   }, [connector]);
 
   // Show loading until mounted
