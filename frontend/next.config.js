@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // ✅ REQUIRED for Render static sites
+  output: 'export',
+  
+  images: {
+    unoptimized: true,
+  },
+  
+  // Optional: trailing slashes
+  trailingSlash: true,
+  
   webpack: (config, { isServer }) => {
     // Enable WebAssembly
     config.experiments = {
