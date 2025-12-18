@@ -19,11 +19,13 @@ console.log("🔧 [INIT] PORTAL_ADDRESS:", PORTAL_ADDRESS);
 const policies: SessionPolicies = {
   contracts: {
     [PORTAL_ADDRESS]: {
+      name: "Token Migration Portal",
+      description: "Claim your migrated GGMT tokens",
       methods: [
         {
           name: "Claim Tokens",
           entrypoint: "claim",
-          description: "Claim your migrated tokens",
+          description: "Claim your migrated tokens (gasless)",
         },
         {
           name: "Check Claimable",
@@ -57,16 +59,30 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
     
     try {
-      console.log("🔧 [INIT] Creating ControllerConnector...");
+      console.log("🔧 [INIT] Creating ControllerConnector with optimized config...");
+      // Using 'as any' to allow advanced options that may not be in type definitions
+      // but are supported at runtime by Cartridge Controller
       const ctrl = new ControllerConnector({
+        // Network configuration
         chains: [
           { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
           { rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet" },
         ],
         defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
+        
+        // Session policies for gasless transactions
         policies,
-      });
+        
+        // ✨ Advanced options (may not be in TypeScript types but work at runtime)
+        signupOptions: ["webauthn", "google"],
+        theme: "dope-wars",
+        redirectUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+        lazyload: true,
+        propagateSessionErrors: true,
+      } as any);
+      
       console.log("✅ [INIT] ControllerConnector created:", ctrl.id);
+      console.log("🔑 [INIT] Session policies configured for gasless claims");
       return ctrl;
     } catch (error) {
       console.error("❌ [INIT] ControllerConnector failed:", error);
@@ -95,7 +111,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <p className="text-gray-400">Loading wallet connector...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Initializing secure wallet...</p>
+        </div>
       </div>
     );
   }
@@ -109,6 +128,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
           {initError?.message || "Connector not initialized"}
         </pre>
         <p className="mt-4 text-gray-300">Check browser console (F12) for details.</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
