@@ -80,8 +80,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         url: "https://x.cartridge.gg",
         
         // ✨ Advanced options (may not be in TypeScript types but work at runtime)
-        signupOptions: ["webauthn", "google"],
-        theme: "dope-wars",
+        signupOptions: ["webauthn", "google", "twitter", "github"], // All available authentication methods
+        theme: "dope-wars", // Options: "dope-wars", "cartridge", "degen", "slot"
+        colorMode: "dark", // Options: "dark", "light"
         redirectUrl: typeof window !== "undefined" ? window.location.origin : undefined,
         propagateSessionErrors: true,
       } as any);
