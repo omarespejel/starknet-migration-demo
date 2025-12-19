@@ -93,9 +93,16 @@ export default function Home() {
       });
       
       // ✨ NEW: User-friendly error messages
-      if (connectError.message.includes("rejected") || connectError.message.includes("denied")) {
+      if (connectError.message.includes("rejected") || 
+          connectError.message.includes("denied") ||
+          connectError.message.includes("cancelled")) {
         addDebugMessage(`❌ Connection cancelled - please try again`);
         setError("Connection was cancelled. Please click 'Connect Controller' to create your wallet.");
+        
+        // ✨ FIX: Reset error after a short delay to allow retry
+        setTimeout(() => {
+          setError(null);
+        }, 3000); // Clear after 3 seconds
       } else {
         addDebugMessage(`❌ Connection error: ${connectError.message}`);
         setError(connectError.message);
@@ -366,7 +373,10 @@ export default function Home() {
                 </div>
               </div>
               <button
-                onClick={handleConnect}
+                onClick={() => {
+                  setError(null); // Clear previous errors
+                  handleConnect();
+                }}
                 disabled={isConnecting}
                 className={`px-8 py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 ${
                   isConnecting 
