@@ -9,14 +9,14 @@ import { useState, useEffect } from "react";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_ID;
 
-// Debug logging
+// debug logging
 console.log("[ETH_PROVIDERS] INIT", {
   projectId: projectId ? `${projectId.slice(0, 8)}...` : "MISSING",
   env: process.env.NODE_ENV,
 });
 
 if (!projectId || projectId === "YOUR_PROJECT_ID") {
-  console.error("[ETH_PROVIDERS] ❌ Missing NEXT_PUBLIC_WALLETCONNECT_ID in .env.local");
+  console.error("[ETH_PROVIDERS] Missing NEXT_PUBLIC_WALLETCONNECT_ID in .env.local");
   console.error("[ETH_PROVIDERS] Get your Project ID from https://cloud.reown.com");
 }
 
@@ -33,7 +33,7 @@ export function EthProviders({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    console.log("[ETH_PROVIDERS] ✅ Mounted");
+    console.log("[ETH_PROVIDERS] Mounted");
   }, []);
 
   // Prevent hydration mismatch

@@ -1,27 +1,7 @@
 "use client";
 
-/**
- * Starknet Provider Configuration with Cartridge Controller
- * 
- * This component sets up the Starknet React provider with Cartridge Controller integration.
- * Cartridge Controller is a smart wallet solution that provides three key advantages:
- * 
- * 1. Gasless Transactions: Uses session keys to pre-authorize transactions, eliminating
- *    gas fees for users. The session keys are stored securely in Cartridge's keychain.
- * 
- * 2. Passkey Authentication: Instead of seed phrases, users authenticate with WebAuthn
- *    passkeys (biometrics or hardware security keys). This improves security and UX.
- * 
- * 3. Invisible Execution: After initial session approval, transactions matching the
- *    policy execute automatically without user interaction or popups.
- * 
- * How Session Keys Work:
- * - User connects and approves a session policy (one-time)
- * - Cartridge generates temporary signing keys for approved contract methods
- * - These keys are stored in Cartridge's secure keychain
- * - Future transactions matching the policy use these keys automatically
- * - No user approval needed, no gas fees charged
- */
+// starknet provider setup with cartridge controller
+// cartridge gives us gasless txns via session keys, passkey auth, and auto-execution
 
 import { sepolia, mainnet } from "@starknet-react/chains";
 import {
@@ -37,16 +17,8 @@ import { useMemo, useState, useEffect } from "react";
 const PORTAL_ADDRESS = process.env.NEXT_PUBLIC_PORTAL_ADDRESS ||
   "0x027d9db485a394d3aea0c3af6a82b889cb95a833cc4fe36ede8696624f0310fb";
 
-/**
- * Session Policies: Define which contract methods can be called gaslessly
- * 
- * When a user connects Cartridge Controller, they approve this policy. The policy
- * grants permission for the portal contract's `claim` and `get_claimable` methods
- * to be executed using session keys without user interaction.
- * 
- * This is a security feature: users explicitly approve which methods can be called
- * automatically. Other methods still require explicit user approval.
- */
+// session policies - defines which methods can be called gaslessly
+// user approves this once, then these methods run automatically without popups
 const policies: SessionPolicies = {
   contracts: {
     [PORTAL_ADDRESS]: {
@@ -68,13 +40,7 @@ const policies: SessionPolicies = {
   },
 };
 
-/**
- * RPC Provider Configuration
- * 
- * We use Cartridge's public RPC endpoints for Starknet. These endpoints provide
- * reliable access to the Starknet network and are optimized for Cartridge Controller
- * integrations.
- */
+// rpc provider - using cartridge's endpoints
 const provider = jsonRpcProvider({
   rpc: (chain) => {
     const url = chain.id === sepolia.id
@@ -88,55 +54,40 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
 
-  /**
-   * Controller Connector Initialization
-   * 
-   * We create the Cartridge Controller connector only on the client side (not during
-   * server-side rendering) because it requires browser APIs like window and indexedDB.
-   * 
-   * Key Configuration Options:
-   * - chains: Supported Starknet networks (Sepolia testnet and mainnet)
-   * - policies: Session policies defining gasless transaction permissions
-   * - url: Cartridge keychain URL where session keys are stored
-   * - redirectUrl: Where to redirect after authentication (production domain)
-   * - signupOptions: Authentication methods (WebAuthn passkeys, social logins)
-   * 
-   * The connector creates an iframe that communicates with Cartridge's keychain service.
-   * This iframe handles authentication, session key management, and transaction signing.
-   */
+  // create the cartridge connector - only on client side since it needs browser APIs
   const connector = useMemo(() => {
-    // Skip connector creation during server-side rendering
+    // skip during SSR
     if (typeof window === "undefined") {
       return null;
     }
     
     try {
       const ctrl = new ControllerConnector({
-        // Network configuration: support both testnet and mainnet
+        // networks we support
         chains: [
           { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
           { rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet" },
         ],
         defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
         
-        // Session policies: define which methods can be called gaslessly
+        // session policies for gasless txns
         policies,
         
-        // Keychain URL: where Cartridge stores session keys and handles authentication
+        // keychain url
         url: "https://x.cartridge.gg",
         
-        // Authentication options: WebAuthn passkeys and social logins
+        // auth options
         signupOptions: ["webauthn", "google", "twitter", "github"],
         
-        // UI customization
+        // ui stuff
         theme: "dope-wars",
         colorMode: "dark",
         
-        // Production redirect URL: where to redirect after authentication
+        // redirect after auth
         redirectUrl: process.env.NEXT_PUBLIC_CARTRIDGE_REDIRECT_URL || 
                      (typeof window !== "undefined" ? window.location.origin : undefined),
         
-        // Error propagation: surface session errors to the application
+        // show errors if session fails
         propagateSessionErrors: true,
       } as any);
       
@@ -148,44 +99,44 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Mark as mounted after hydration
+  // mark as mounted after hydration
   useEffect(() => {
-    console.log("🔧 [MOUNT] Client mounted, connector:", connector?.id || "null");
+    console.log("[MOUNT] Client mounted, connector:", connector?.id || "null");
     setMounted(true);
     
-    // Test Cartridge connectivity
+    // test if cartridge rpc is reachable (just for debugging)
     fetch("https://api.cartridge.gg/x/starknet/sepolia", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", method: "starknet_chainId", params: [], id: 1 }),
     })
       .then(r => r.json())
-      .then(data => console.log("✅ Cartridge RPC reachable, chain:", data.result))
-      .catch(e => console.error("❌ Cartridge RPC error:", e.message));
+      .then(data => console.log("[MOUNT] Cartridge RPC reachable, chain:", data.result))
+      .catch(e => console.error("[MOUNT] Cartridge RPC error:", e.message));
       
-    // ✨ NEW: Test keychain accessibility
+    // test keychain
     fetch("https://x.cartridge.gg/health")
-      .then(r => console.log("✅ Cartridge keychain reachable:", r.status))
-      .catch(e => console.error("❌ Cartridge keychain error:", e.message));
+      .then(r => console.log("[MOUNT] Cartridge keychain reachable:", r.status))
+      .catch(e => console.error("[MOUNT] Cartridge keychain error:", e.message));
   }, [connector]);
 
-  // Show loading until mounted
+  // show loading until mounted
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Initializing secure wallet...</p>
+          <p className="text-gray-400">Initializing wallet...</p>
         </div>
       </div>
     );
   }
 
-  // Show error if connector failed
+  // show error if connector failed
   if (initError || !connector) {
     return (
       <div className="min-h-screen bg-red-900 text-white p-8">
-        <h1 className="text-2xl font-bold mb-4">⚠️ Controller Init Error</h1>
+        <h1 className="text-2xl font-bold mb-4">Controller Init Error</h1>
         <pre className="font-mono text-sm bg-black/50 p-4 rounded overflow-auto">
           {initError?.message || "Connector not initialized"}
         </pre>
@@ -200,7 +151,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     );
   }
 
-  console.log("🔧 [RENDER] Providers with connector:", connector.id);
+  console.log("[RENDER] Providers with connector:", connector.id);
 
   return (
     <StarknetConfig

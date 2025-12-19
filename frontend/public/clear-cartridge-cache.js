@@ -1,20 +1,13 @@
-/**
- * Cartridge Controller Cache Clearing Utility
- * 
- * Run this in the browser console on your deployed site to clear all Cartridge storage
- * 
- * Usage:
- * 1. Open browser console (F12)
- * 2. Copy and paste this entire script
- * 3. Or visit: https://your-site.onrender.com/clear-cartridge-cache.js
- */
+// clear cartridge controller cache
+// run this in browser console (F12) to clear all cartridge storage
+// or just visit the /clear-cartridge-cache.js url
 
 (function clearCartridgeCache() {
-  console.log('🧹 Clearing Cartridge Controller storage...');
+  console.log('Clearing Cartridge Controller storage...');
   
   let cleared = 0;
   
-  // Clear localStorage
+  // clear localStorage
   try {
     const localStorageKeys = Object.keys(localStorage);
     localStorageKeys.forEach(key => {
@@ -23,12 +16,12 @@
         cleared++;
       }
     });
-    console.log(`✅ Cleared ${cleared} localStorage items`);
+    console.log(`Cleared ${cleared} localStorage items`);
   } catch (e) {
-    console.warn('⚠️ localStorage clear failed:', e);
+    console.warn('localStorage clear failed:', e);
   }
   
-  // Clear sessionStorage
+  // clear sessionStorage
   try {
     const sessionStorageKeys = Object.keys(sessionStorage);
     sessionStorageKeys.forEach(key => {
@@ -37,12 +30,12 @@
         cleared++;
       }
     });
-    console.log(`✅ Cleared sessionStorage items`);
+    console.log('Cleared sessionStorage items');
   } catch (e) {
-    console.warn('⚠️ sessionStorage clear failed:', e);
+    console.warn('sessionStorage clear failed:', e);
   }
   
-  // Clear IndexedDB
+  // clear indexedDB
   try {
     indexedDB.databases().then(dbs => {
       const cartridgeDbs = dbs.filter(db => 
@@ -53,30 +46,30 @@
       
       if (cartridgeDbs.length > 0) {
         cartridgeDbs.forEach(db => {
-          console.log(`🗑️ Deleting IndexedDB: ${db.name}`);
+          console.log(`Deleting IndexedDB: ${db.name}`);
           indexedDB.deleteDatabase(db.name);
           cleared++;
         });
-        console.log(`✅ Cleared ${cartridgeDbs.length} IndexedDB databases`);
+        console.log(`Cleared ${cartridgeDbs.length} IndexedDB databases`);
       } else {
-        console.log('ℹ️ No Cartridge-related IndexedDB databases found');
+        console.log('No Cartridge-related IndexedDB databases found');
       }
       
-      console.log(`\n🎉 Total items cleared: ${cleared}`);
-      console.log('🔄 Reloading page in 2 seconds...');
+      console.log(`\nTotal items cleared: ${cleared}`);
+      console.log('Reloading page in 2 seconds...');
       setTimeout(() => {
         location.reload();
       }, 2000);
     }).catch(e => {
-      console.warn('⚠️ IndexedDB clear failed:', e);
-      console.log('🔄 Reloading page anyway...');
+      console.warn('IndexedDB clear failed:', e);
+      console.log('Reloading page anyway...');
       setTimeout(() => {
         location.reload();
       }, 2000);
     });
   } catch (e) {
-    console.warn('⚠️ IndexedDB not available:', e);
-    console.log('🔄 Reloading page...');
+    console.warn('IndexedDB not available:', e);
+    console.log('Reloading page...');
     setTimeout(() => {
       location.reload();
     }, 2000);

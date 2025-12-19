@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ REQUIRED for Render static sites
+  // required for static export (render.com)
   output: 'export',
   
   images: {

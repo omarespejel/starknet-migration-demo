@@ -1,23 +1,6 @@
-/**
- * Merkle Tree Utilities for Token Migration Claims
- * 
- * A merkle tree is a cryptographic data structure that enables efficient proof
- * verification. Instead of storing all eligible addresses on-chain (expensive),
- * we store only the root hash. Users provide proofs that their address is in
- * the tree, and the contract verifies these proofs against the root.
- * 
- * How Merkle Trees Work:
- * 1. Snapshot: Take a snapshot of all eligible L1 addresses and their token amounts
- * 2. Tree Generation: Build a binary tree where each leaf is a hash of (address, amount)
- * 3. Root Storage: Store only the root hash in the portal contract
- * 4. Proof Generation: For each address, generate a proof path from leaf to root
- * 5. Verification: Contract verifies proof by recomputing hashes up to the root
- * 
- * Advantages:
- * - Gas Efficient: Only one hash (root) stored on-chain, not all addresses
- * - Scalable: Works for millions of addresses without increasing contract storage
- * - Verifiable: Cryptographic proofs ensure data integrity
- */
+// merkle tree stuff for checking eligibility
+// basically we store just the root hash on-chain, then users prove their address is in the tree
+// way cheaper than storing all addresses on-chain
 
 export interface ClaimData {
   address: string;      // ETH/IMX address from L1 snapshot
@@ -30,48 +13,24 @@ export interface MerkleTree {
   claims: ClaimData[];  // All eligible addresses with their proofs
 }
 
-/**
- * Normalize Ethereum Address
- * 
- * Ethereum addresses are case-insensitive but often stored with mixed case.
- * This function normalizes addresses for comparison by converting to lowercase
- * and removing the 0x prefix.
- * 
- * Why normalize? Different wallets may return addresses in different cases,
- * but they represent the same address. Normalization ensures consistent matching.
- */
+// normalize eth address - lowercase and remove 0x
+// wallets sometimes return addresses in different cases but they're the same address
 export function normalizeEthAddress(address: string): string {
   if (!address) return '';
   return address.toLowerCase().replace('0x', '');
 }
 
-/**
- * Fetch Allocation Data from Merkle Tree
- * 
- * This function looks up an Ethereum address in the merkle tree and returns
- * the allocation amount and proof if found. The lookup is done client-side
- * by fetching merkle-tree.json from the public folder.
- * 
- * In production, this would typically call a backend API that:
- * 1. Verifies the Ethereum signature
- * 2. Looks up the allocation in a database
- * 3. Generates or retrieves the merkle proof
- * 4. Returns the data securely
- * 
- * Why client-side lookup for demo? Simplifies the demo and allows developers
- * to see how merkle proofs work without backend infrastructure.
- * 
- * @param ethAddress - Ethereum address to look up (from L1 snapshot)
- * @param _starknetAddress - Starknet address (kept for API compatibility, not used)
- * @returns Allocation data with amount and proof, or null if not eligible
- */
+// fetch allocation from merkle tree
+// looks up the eth address and returns amount + proof if found
+// NOTE: in prod this would be a backend API call, but for demo we just fetch the json file
+// TODO: add proper error handling for network failures
 export async function fetchAllocation(
   ethAddress: string,
   _starknetAddress: string  // Kept for API compatibility, but not used for lookup
 ): Promise<{ amount: string; proof: string[] } | null> {
   try {
-    // Fetch merkle tree data from public folder
-    // In production, this would be a backend API call
+    // fetch the merkle tree json file
+    // TODO: replace with backend API in production
     const response = await fetch('/merkle-tree.json');
     if (!response.ok) {
       throw new Error(`Failed to fetch merkle tree: ${response.status}`);
@@ -79,22 +38,21 @@ export async function fetchAllocation(
     
     const data: MerkleTree = await response.json();
     
-    // Lookup by ETH address (the L1 snapshot)
-    // The merkle tree is keyed by Ethereum addresses, not Starknet addresses
+    // lookup by eth address (not starknet address)
     const normalizedEth = normalizeEthAddress(ethAddress);
     const claim = data.claims.find((c: ClaimData) => 
       normalizeEthAddress(c.address) === normalizedEth
     );
     
     if (!claim) {
-      // Address not found in merkle tree - user is not eligible
+      // not in the tree, so not eligible
       return null;
     }
     
-    // Return the allocation data needed for the claim transaction
+    // return the amount and proof for the claim tx
     return {
-      amount: claim.amount,  // Token amount in wei format
-      proof: claim.proof     // Merkle proof array for on-chain verification
+      amount: claim.amount,  // in wei
+      proof: claim.proof     // merkle proof array
     };
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {

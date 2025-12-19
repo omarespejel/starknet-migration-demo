@@ -7,11 +7,9 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { PORTAL_ADDRESS, getStarkscanUrl } from "@/lib/constants"
 import { fetchAllocation } from "@/lib/merkle"
 
-// ==================== COMPONENTS ====================
+// components for the UI
 
-/**
- * Info box that explains a concept
- */
+// just a box that shows some info, nothing fancy
 function InfoBox({ 
   title, 
   children, 
@@ -38,9 +36,7 @@ function InfoBox({
   )
 }
 
-/**
- * Step indicator with context
- */
+// step header thing, shows which step we're on
 function StepHeader({ 
   step, 
   title, 
@@ -60,7 +56,7 @@ function StepHeader({
         w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold
         ${isComplete ? "bg-black text-white" : isActive ? "bg-black text-white" : "bg-neutral-200 text-neutral-500"}
       `}>
-        {isComplete ? "✓" : step}
+        {isComplete ? "done" : step}
       </div>
       <div>
         <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
@@ -70,9 +66,7 @@ function StepHeader({
   )
 }
 
-/**
- * Live data display showing what's happening
- */
+// shows live data values, pretty straightforward
 function LiveDataDisplay({ 
   label, 
   value, 
@@ -95,9 +89,8 @@ function LiveDataDisplay({
   )
 }
 
-/**
- * Transaction calldata visualizer
- */
+// visualizes the calldata we're sending to starknet
+// TODO: maybe add more details about what each field means
 function CalldataVisualizer({ 
   amount, 
   proof,
@@ -152,9 +145,7 @@ function CalldataVisualizer({
   )
 }
 
-/**
- * Architecture diagram showing the flow
- */
+// shows the flow diagram, updates based on current step
 function ArchitectureDiagram({ currentStep }: { currentStep: number }) {
   return (
     <div className="bg-neutral-50 rounded-lg p-6 border border-neutral-200">
@@ -222,9 +213,7 @@ function ArchitectureDiagram({ currentStep }: { currentStep: number }) {
   )
 }
 
-/**
- * Cartridge feature information
- */
+// shows what cartridge controller can do
 function CartridgeFeatures({ isConnected }: { isConnected: boolean }) {
   return (
     <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
@@ -251,16 +240,16 @@ function CartridgeFeatures({ isConnected }: { isConnected: boolean }) {
   )
 }
 
-// ==================== MAIN PAGE COMPONENT ====================
+// main component, handles the whole migration flow
 
 export default function Home() {
-  // Wallet states
+  // wallet stuff
   const { address: ethAddress, isConnected: ethConnected } = useEthAccount()
   const { address: starknetAddress, account, status: starknetStatus } = useStarknetAccount()
   const { connect, connectors } = useConnect()
   const { signMessage, isPending: isSigning, data: signature } = useSignMessage()
 
-  // Migration states
+  // state for the migration flow
   const [migrationStep, setMigrationStep] = useState(1)
   const [isEligible, setIsEligible] = useState<boolean | null>(null)
   const [claimAmount, setClaimAmount] = useState<string | null>(null)
@@ -270,10 +259,10 @@ export default function Home() {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [loadingAllocation, setLoadingAllocation] = useState(false)
 
-  // Find Cartridge Controller connector
+  // find the cartridge connector
   const controllerConnector = connectors.find((c) => c.id === "controller")
 
-  // Check eligibility when ETH wallet connects
+  // check if user is eligible when they connect their eth wallet
   useEffect(() => {
     if (!ethAddress) {
       setIsEligible(null)
@@ -303,7 +292,7 @@ export default function Home() {
     checkEligibility()
   }, [ethAddress, starknetAddress])
 
-  // Progress through steps
+  // move to next step when conditions are met
   useEffect(() => {
     if (ethConnected && isEligible && migrationStep === 1) {
       setMigrationStep(2)
@@ -322,7 +311,7 @@ export default function Home() {
     }
   }, [txHash, migrationStep])
 
-  // Sign authorization message
+  // sign the auth message with metamask
   const handleSign = () => {
     if (!ethAddress || !starknetAddress) return
     
@@ -339,7 +328,7 @@ This signature proves ownership and authorizes the claim.`
     signMessage({ message })
   }
 
-  // Claim tokens
+  // actually claim the tokens on starknet
   const handleClaim = async () => {
     if (!account || !claimAmount || claiming) return
 
@@ -391,7 +380,7 @@ This signature proves ownership and authorizes the claim.`
     }
   }
 
-  // Format amount for display
+  // convert wei to tokens for display
   const formatAmount = (amount: string | null) => {
     if (!amount) return "0"
     return (BigInt(amount) / BigInt(10 ** 18)).toString()
