@@ -48,7 +48,6 @@
     "render.yaml",
     "snapshot.json",
     "snapshot.example.json",
-    "snfoundry.toml",
     "contracts/Scarb.toml",
     "contracts/snfoundry.example.toml",
     "contracts/src/**",
