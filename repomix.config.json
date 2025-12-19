@@ -41,7 +41,7 @@
     "CARTRIDGE_CUSTOMIZATION.md",
     "SECURITY_AUDIT_FIXES.md",
     "frontend/METAMASK_INTEGRATION.md",
-    "frontend/TESTING.md",
+    "frontend/ARCHITECTURE.md",
     "repomix.config.json",
     ".gitignore",
     "Makefile",
