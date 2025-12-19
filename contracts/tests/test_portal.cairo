@@ -3,6 +3,7 @@ use snforge_std::{
     start_cheat_caller_address, stop_cheat_caller_address,
     start_cheat_block_number_global, stop_cheat_block_number_global,
 };
+use starknet::SyscallResultTrait;
 use migration_portal::portal::{
     IMigrationPortalDispatcher, IMigrationPortalDispatcherTrait,
     IPortalAdminDispatcher, IPortalAdminDispatcherTrait
@@ -19,7 +20,7 @@ fn USER() -> ContractAddress {
 }
 
 fn deploy_token(admin: ContractAddress, minter: ContractAddress) -> IMigrationTokenDispatcher {
-    let contract = declare("MigrationToken").unwrap().contract_class();
+    let contract = declare("MigrationToken").unwrap_syscall().contract_class();
     let mut constructor_args = array![];
     let name: ByteArray = "MigrationToken";
     let symbol: ByteArray = "MIG";
@@ -29,7 +30,7 @@ fn deploy_token(admin: ContractAddress, minter: ContractAddress) -> IMigrationTo
     // minter can be zero address - will be set later via grant_minter_role
     minter.serialize(ref constructor_args);
     
-    let (contract_address, _) = contract.deploy(@constructor_args).unwrap();
+    let (contract_address, _) = contract.deploy(@constructor_args).unwrap_syscall();
     IMigrationTokenDispatcher { contract_address }
 }
 
@@ -40,7 +41,7 @@ fn deploy_portal(
     claim_deadline_block: u64,
     max_claim_amount: u256
 ) -> IMigrationPortalDispatcher {
-    let contract = declare("MigrationPortal").unwrap().contract_class();
+    let contract = declare("MigrationPortal").unwrap_syscall().contract_class();
     let mut constructor_args = array![];
     owner.serialize(ref constructor_args);
     token.serialize(ref constructor_args);
@@ -49,7 +50,7 @@ fn deploy_portal(
     max_claim_amount.low.serialize(ref constructor_args);
     max_claim_amount.high.serialize(ref constructor_args);
     
-    let (contract_address, _) = contract.deploy(@constructor_args).unwrap();
+    let (contract_address, _) = contract.deploy(@constructor_args).unwrap_syscall();
     IMigrationPortalDispatcher { contract_address }
 }
 

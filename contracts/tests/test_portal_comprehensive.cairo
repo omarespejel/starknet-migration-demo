@@ -3,6 +3,7 @@ use snforge_std::{
     start_cheat_caller_address, stop_cheat_caller_address,
     start_cheat_block_number_global, stop_cheat_block_number_global,
 };
+use starknet::SyscallResultTrait;
 use migration_portal::portal::{
     IMigrationPortalDispatcher, IMigrationPortalDispatcherTrait,
     IPortalAdminDispatcher, IPortalAdminDispatcherTrait,
@@ -29,7 +30,7 @@ fn deploy_token_and_portal(
     max_claim_amount: u256
 ) -> (ContractAddress, ContractAddress, IMigrationPortalDispatcher) {
     // Deploy token first with admin as temporary minter
-    let token_contract = declare("MigrationToken").unwrap().contract_class();
+    let token_contract = declare("MigrationToken").unwrap_syscall().contract_class();
     let mut token_args = array![];
     let name: ByteArray = "MigToken";
     let symbol: ByteArray = "MIG";
@@ -37,10 +38,10 @@ fn deploy_token_and_portal(
     symbol.serialize(ref token_args);
     OWNER().serialize(ref token_args);
     OWNER().serialize(ref token_args); // Admin as temporary minter
-    let (token_address, _) = token_contract.deploy(@token_args).unwrap();
+    let (token_address, _) = token_contract.deploy(@token_args).unwrap_syscall();
     
     // Deploy portal
-    let portal_contract = declare("MigrationPortal").unwrap().contract_class();
+    let portal_contract = declare("MigrationPortal").unwrap_syscall().contract_class();
     let mut portal_args = array![];
     OWNER().serialize(ref portal_args);
     token_address.serialize(ref portal_args);
@@ -48,7 +49,7 @@ fn deploy_token_and_portal(
     deadline.serialize(ref portal_args);
     max_claim_amount.low.serialize(ref portal_args);
     max_claim_amount.high.serialize(ref portal_args);
-    let (portal_address, _) = portal_contract.deploy(@portal_args).unwrap();
+    let (portal_address, _) = portal_contract.deploy(@portal_args).unwrap_syscall();
     
     // Grant minter role to portal
     let access_dispatcher = IAccessControlDispatcher { contract_address: token_address };
