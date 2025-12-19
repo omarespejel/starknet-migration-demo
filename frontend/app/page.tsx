@@ -285,8 +285,13 @@ export default function Home() {
       console.log("[CLAIM] claimProof:", claimProof)
       console.log("[CLAIM] account.address:", account.address)
       console.log("[CLAIM] PORTAL_ADDRESS:", PORTAL_ADDRESS)
+      
+      // Check account object has execute method
+      if (!account.execute || typeof account.execute !== 'function') {
+        throw new Error("Account object is invalid or missing execute method. Try reconnecting your wallet.")
+      }
 
-      // Convert amount to u256 (low, high) - use hex strings like working page.tsx
+      // Convert amount to u256 (low, high) - use hex strings
       const amountBigInt = BigInt(claimAmount)
       const LOW_MASK = BigInt("0xffffffffffffffffffffffffffffffff") // 128-bit mask
       const amountLow = "0x" + (amountBigInt & LOW_MASK).toString(16)
@@ -295,7 +300,7 @@ export default function Home() {
       // Proof serialization: Span<felt252> = [length, ...elements]
       const proofLength = claimProof.length.toString()
 
-      // Build calldata manually (matches working home page pattern)
+      // Build calldata manually
       const calldata = [amountLow, amountHigh, proofLength, ...claimProof]
 
       console.log("[CLAIM] Prepared calldata:", {
@@ -308,7 +313,7 @@ export default function Home() {
         fullCalldata: calldata,
       })
 
-      // Prepare transaction object (single object, not array)
+      // Prepare transaction object
       const tx = {
         contractAddress: PORTAL_ADDRESS,
         entrypoint: "claim",
@@ -318,14 +323,29 @@ export default function Home() {
       console.log("[CLAIM] Transaction object:", JSON.stringify(tx, null, 2))
       console.log("[CLAIM] Executing with account.execute()...")
 
-      // Execute claim transaction
-      const startTime = Date.now()
-      const result = await account.execute(tx)
-      const duration = Date.now() - startTime
+      // Execute with explicit error handling for undefined rejection
+      let result: any
+      try {
+        result = await account.execute(tx)
+      } catch (executeError) {
+        // Handle the case where Cartridge rejects with undefined
+        if (executeError === undefined || executeError === null) {
+          throw new Error(
+            "Cartridge Controller session may have expired. Please disconnect and reconnect your wallet."
+          )
+        }
+        throw executeError
+      }
+
+      // Check if result is undefined (another failure mode)
+      if (!result) {
+        throw new Error(
+          "Transaction returned empty result. Please disconnect and reconnect your wallet."
+        )
+      }
 
       console.log("[CLAIM] ====== SUCCESS ======")
       console.log("[CLAIM] Result:", result)
-      console.log("[CLAIM] Duration:", duration, "ms")
 
       // Validate result
       if (result?.transaction_hash) {
@@ -333,36 +353,27 @@ export default function Home() {
         addDebugMessage(`Transaction submitted: ${result.transaction_hash.slice(0, 20)}...`)
         console.log("[CLAIM] Transaction hash:", result.transaction_hash)
       } else {
-        throw new Error("No transaction hash returned from account.execute")
+        throw new Error("No transaction hash in result. Transaction may have failed.")
       }
     } catch (err: unknown) {
-      // ====== COMPREHENSIVE ERROR LOGGING ======
       console.log("[CLAIM] ====== ERROR ======")
       console.log("[CLAIM] Error type:", typeof err)
       console.log("[CLAIM] Error:", err)
       
+      // Handle undefined error (Cartridge SDK bug)
+      if (err === undefined || err === null) {
+        const msg = "Wallet session error. Please clear cache and reconnect."
+        setClaimError(msg)
+        addDebugMessage(`Claim error: ${msg}`)
+        return
+      }
+      
       // Log all properties of the error object
       if (err && typeof err === "object") {
-        console.log("[CLAIM] Error properties:", Object.keys(err))
-        console.log("[CLAIM] Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2))
-        
-        // Try to extract nested error info
+        console.log("[CLAIM] Error properties:", Object.keys(err as object))
         const anyErr = err as any
         console.log("[CLAIM] err.message:", anyErr.message)
-        console.log("[CLAIM] err.code:", anyErr.code)
-        console.log("[CLAIM] err.data:", anyErr.data)
         console.log("[CLAIM] err.cause:", anyErr.cause)
-        console.log("[CLAIM] err.reason:", anyErr.reason)
-        console.log("[CLAIM] err.revert_reason:", anyErr.revert_reason)
-        console.log("[CLAIM] err.error:", anyErr.error)
-        
-        // Starknet specific
-        if (anyErr.response) {
-          console.log("[CLAIM] err.response:", anyErr.response)
-        }
-        if (anyErr.transaction_failure_reason) {
-          console.log("[CLAIM] err.transaction_failure_reason:", anyErr.transaction_failure_reason)
-        }
       }
 
       // Build error message for UI
@@ -373,27 +384,14 @@ export default function Home() {
         
         // Parse Starknet-specific errors
         if (err.message?.includes("invalid merkle proof")) {
-          errorMessage = "Invalid merkle proof. The merkle tree may need regeneration with your Starknet address."
+          errorMessage = "Invalid merkle proof. Your Starknet address may not be in the snapshot."
         } else if (err.message?.includes("already claimed")) {
           errorMessage = "You have already claimed your tokens."
         } else if (err.message?.includes("claim period ended")) {
           errorMessage = "The claim period has ended."
-        } else if (err.message?.includes("amount must be positive")) {
-          errorMessage = "Claim amount must be greater than zero."
-        } else if (err.message?.includes("Pausable: paused")) {
-          errorMessage = "The contract is currently paused."
         }
       } else if (typeof err === "string") {
         errorMessage = err
-      } else if (err && typeof err === "object") {
-        const anyErr = err as any
-        if (anyErr.message) {
-          errorMessage = String(anyErr.message)
-        } else if (anyErr.revert_reason) {
-          errorMessage = String(anyErr.revert_reason)
-        } else if (anyErr.cause?.message) {
-          errorMessage = String(anyErr.cause.message)
-        }
       }
 
       console.log("[CLAIM] Final error message:", errorMessage)
