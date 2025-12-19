@@ -95,10 +95,10 @@ snforge test
 
 ```bash
 cd frontend
-bun install
+npm install
 cp .env.local.example .env.local
 # Edit .env.local with your portal contract address
-bun run dev
+npm run dev
 ```
 
 ## Usage
@@ -111,8 +111,8 @@ Verify that TypeScript and Cairo compute the same leaf hashes:
 
 ```bash
 cd scripts
-bun install  # Install dependencies if not already installed
-bun run validate  # or: bun ts-node validate_leaf.ts
+npm install  # Install dependencies if not already installed
+npx ts-node validate_leaf.ts
 ```
 
 Compare the output with Cairo test results. To get Cairo values, run:
@@ -124,7 +124,7 @@ snforge test test_claim_single_user_succeeds -v
 
 The leaf hash should match between TypeScript and Cairo.
 
-**Note:** If `bun install` fails for `@starkware-industries/starkware-utils`, you may need to install it from GitHub or use an alternative Poseidon implementation. The merkle tree generation will still work if you have the correct dependencies.
+**Note:** If `npm install` fails for `@starkware-industries/starkware-utils`, you may need to install it from GitHub or use an alternative Poseidon implementation. The merkle tree generation will still work if you have the correct dependencies.
 
 **Step 1.2: Create Snapshot File**
 
@@ -147,7 +147,7 @@ Create a snapshot file (`snapshot.json`) with claim data. You can use `snapshot.
 
 ```bash
 cd scripts
-bun run generate  # or: bun ts-node generate_merkle.ts ../snapshot.json
+npx ts-node generate_merkle.ts ../snapshot.json
 ```
 
 This generates `merkle_tree.json` with the root and proofs for each claim. Save the `root` value for deployment.
@@ -209,8 +209,8 @@ NEXT_PUBLIC_PORTAL_ADDRESS=0x...
 
 ```bash
 cd frontend
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 Open http://localhost:3000 and connect your wallet to test the claim flow.
@@ -225,8 +225,8 @@ Open http://localhost:3000 and connect your wallet to test the claim flow.
 
 ```bash
 # 1. Generate merkle tree
-cd scripts && bun install
-bun run generate  # or: bun ts-node generate_merkle.ts ../snapshot.json
+cd scripts && npm install
+npx ts-node generate_merkle.ts ../snapshot.json
 
 # 2. Deploy contracts
 export ADMIN=0x<YOUR_ADDRESS>
@@ -240,7 +240,7 @@ export NETWORK=sepolia
 # 4. Configure frontend
 cd ../frontend
 echo "NEXT_PUBLIC_PORTAL_ADDRESS=0x<PORTAL_ADDRESS>" > .env.local
-bun install && bun run dev
+npm install && npm run dev
 ```
 
 ## Security Features

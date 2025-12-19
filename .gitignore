@@ -32,7 +32,6 @@ build/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
-bun.lockb
 
 # Repomix context files
 context*.xml

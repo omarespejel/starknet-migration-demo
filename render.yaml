@@ -2,13 +2,19 @@ services:
   - type: web
     name: starknet-migration-demo
     env: static
-    buildCommand: cd frontend && bun install && bun run build
+    buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/out
     envVars:
       - key: NEXT_PUBLIC_PORTAL_ADDRESS
         value: "0x027d9db485a394d3aea0c3af6a82b889cb95a833cc4fe36ede8696624f0310fb"
       - key: NEXT_PUBLIC_TOKEN_ADDRESS
         value: "0x07ef08eb2287fe9a996bb3de1e284b595fab5baae51374e0d8fc088c2d4334c9"
+      - key: NEXT_PUBLIC_NETWORK
+        value: "sepolia"
+      - key: NEXT_PUBLIC_WALLETCONNECT_ID
+        value: "0f2c65deeb7d2cda817916facbd0da1e"
+      - key: NEXT_PUBLIC_CARTRIDGE_REDIRECT_URL
+        value: "https://starknet-migration-demo.onrender.com"
     headers:
       - path: /*
         name: Cache-Control

@@ -28,13 +28,13 @@ frontend/
 
 ```bash
 # Run all tests
-bun test
+npm test
 
 # Run tests in watch mode
-bun test --watch
+npm run test:watch
 
 # Run tests with coverage
-bun test --coverage
+npm run test:coverage
 ```
 
 ## Test Coverage
@@ -145,7 +145,7 @@ Tests should run in CI/CD pipeline:
 - name: Run tests
   run: |
     cd frontend
-    bun test --coverage
+    npm test -- --coverage --watchAll=false
 ```
 
 ## Coverage Goals

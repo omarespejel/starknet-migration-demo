@@ -83,7 +83,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         signupOptions: ["webauthn", "google", "twitter", "github"], // All available authentication methods
         theme: "dope-wars", // Options: "dope-wars", "cartridge", "degen", "slot"
         colorMode: "dark", // Options: "dark", "light"
-        redirectUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+        // Production redirect URL for Cartridge Controller
+        redirectUrl: process.env.NEXT_PUBLIC_CARTRIDGE_REDIRECT_URL || 
+                     (typeof window !== "undefined" ? window.location.origin : undefined),
         propagateSessionErrors: true,
       } as any);
       

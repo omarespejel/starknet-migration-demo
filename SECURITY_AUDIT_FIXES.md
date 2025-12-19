@@ -103,7 +103,7 @@ Response: {
 - [ ] Generate production merkle tree (multi-user)
 - [ ] Move RPC URL to environment variable (deployment step)
 - [ ] Implement backend signature verification (production only)
-- [ ] Run full test suite: `cd frontend && bun test`
+- [ ] Run full test suite: `cd frontend && npm test`
 - [ ] Run contract tests: `cd contracts && snforge test`
 
 ## Environment Variables Required
