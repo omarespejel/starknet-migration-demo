@@ -1,318 +1,253 @@
 "use client";
 
-import { useAccount, useConnect, useDisconnect, useExplorer, useProvider } from "@starknet-react/core";
-import { useState, useCallback, useEffect } from "react";
-import ControllerConnector from "@cartridge/connector/controller";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount as useEthAccount, useSignMessage } from "wagmi";
+import { useAccount as useStarknetAccount, useConnect, useDisconnect, useExplorer, useProvider } from "@starknet-react/core";
+import { useState, useEffect, useCallback } from "react";
+import { CallData } from "starknet";
+import { PORTAL_ADDRESS, TOKEN_ADDRESS, getStarkscanUrl } from "@/lib/constants";
+import { fetchAllocation } from "@/lib/merkle";
 
-const PORTAL_ADDRESS = process.env.NEXT_PUBLIC_PORTAL_ADDRESS || "0x027d9db485a394d3aea0c3af6a82b889cb95a833cc4fe36ede8696624f0310fb";
-const TOKEN_ADDRESS = process.env.NEXT_PUBLIC_TOKEN_ADDRESS || "0x07ef08eb2287fe9a996bb3de1e284b595fab5baae51374e0d8fc088c2d4334c9";
+// Create deterministic message for verification
+const createMigrationMessage = (ethAddress: string, starknetAddress: string) => `
+Token Migration Authorization
 
-// Normalize addresses for comparison (handles padding, case, etc.)
-const normalizeAddress = (addr: string): string => {
-  if (!addr) return "";
-  const clean = addr.replace(/^0x/i, "").toLowerCase();
-  return "0x" + clean.padStart(64, "0");
-};
+I authorize the migration of my tokens from L1 to Starknet.
 
-// Claim data from merkle tree
-// NOTE: This is for the original Cartridge-only flow
-// The new migration flow (/migrate) uses fetchAllocation() from merkle tree
-const CLAIM_DATA = {
-  address: "0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152", // Updated to match merkle tree
-  amount: "1000000000000000000", // 1 token (18 decimals)
-  proof: [] as string[],
-};
+L1 Address: ${ethAddress}
+Starknet Address: ${starknetAddress}
+Timestamp: ${Date.now()}
 
-// Debug logger utility with timestamps
-const debug = {
-  log: (category: string, message: string, data?: any) => {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-    console.log(`[${timestamp}] 🔷 [${category}] ${message}`, data !== undefined ? data : '');
-  },
-  success: (category: string, message: string, data?: any) => {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-    console.log(`[${timestamp}] ✅ [${category}] ${message}`, data !== undefined ? data : '');
-  },
-  error: (category: string, message: string, data?: any) => {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-    console.error(`[${timestamp}] ❌ [${category}] ${message}`, data !== undefined ? data : '');
-  },
-  warn: (category: string, message: string, data?: any) => {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-    console.warn(`[${timestamp}] ⚠️ [${category}] ${message}`, data !== undefined ? data : '');
-  },
-};
+This signature proves ownership and authorizes the claim.
+`.trim();
 
 export default function Home() {
-  debug.log("RENDER", "Home component initializing");
-  
-  const { address, account, status, isConnected, chainId } = useAccount();
-  const { connect, connectors, error: connectError, isPending: isConnecting } = useConnect();
-  const { disconnect } = useDisconnect();
-  const explorer = useExplorer();
-  const { provider } = useProvider();
-  
+  // Migration state - declare ALL state first
+  const [signature, setSignature] = useState<string | null>(null);
+  const [migrationStep, setMigrationStep] = useState<1 | 2 | 3>(1);
+  const [claimAmount, setClaimAmount] = useState<string>("0");
+  const [claimProof, setClaimProof] = useState<string[]>([]);
   const [claiming, setClaiming] = useState(false);
-  const [claimed, setClaimed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [loadingAllocation, setLoadingAllocation] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(true);
-  
-  // ✨ NEW: Track if this is first-time connection
-  const [isFirstConnection, setIsFirstConnection] = useState(true);
+
+  // Ethereum/MetaMask state
+  const { address: ethAddress, isConnected: ethConnected } = useEthAccount();
+  const { signMessage, isPending: isSigning } = useSignMessage({
+    mutation: {
+      onSuccess: (sig) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Signature:", sig);
+        }
+        setSignature(sig);
+        addDebugMessage(`✅ Signature received: ${sig.slice(0, 20)}...`);
+      },
+      onError: (error) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Signature error:", error);
+        }
+        setClaimError("Failed to sign message. Please try again.");
+        addDebugMessage(`❌ Signature error: ${error.message}`);
+      },
+    },
+  });
+
+  // Starknet/Cartridge Controller state
+  const { address: starknetAddress, account, status: starknetStatus } = useStarknetAccount();
+  const { connect, connectors, disconnect } = useConnect();
+  const explorer = useExplorer();
+  const { provider } = useProvider();
+  const controllerConnector = connectors.find((c) => c.id === "controller");
 
   const addDebugMessage = (msg: string) => {
     const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
     setDebugInfo(prev => [...prev.slice(-19), `[${timestamp}] ${msg}`]);
   };
 
-  // Log connection state changes
+  // Fetch merkle proof when ETH address is available (eligibility based on L1 snapshot)
   useEffect(() => {
-    debug.log("STATE", "Connection state changed", { 
-      status, 
-      isConnected, 
-      address: address || 'none',
-      chainId: chainId || 'none',
-      hasAccount: !!account,
-    });
-    addDebugMessage(`Status: ${status}, Connected: ${isConnected}, Address: ${address?.slice(0,10) || 'none'}`);
-    
-    // ✨ NEW: Detect successful first connection
-    if (isConnected && address && isFirstConnection) {
-      setIsFirstConnection(false);
-      addDebugMessage("✨ Session created! Future claims will be gasless");
-      debug.success("SESSION", "First connection complete - session policies active");
-    }
-  }, [status, isConnected, address, chainId, account, isFirstConnection]);
+    if (!ethAddress) return;
 
-  // Log connect errors with better messaging
-  useEffect(() => {
-    if (connectError) {
-      debug.error("CONNECT", "Connection error detected", {
-        message: connectError.message,
-        name: connectError.name,
-      });
-      
-      // ✨ NEW: User-friendly error messages
-      if (connectError.message.includes("rejected") || 
-          connectError.message.includes("denied") ||
-          connectError.message.includes("cancelled")) {
-        addDebugMessage(`❌ Connection cancelled - please try again`);
-        setError("Connection was cancelled. Please click 'Connect Controller' to create your wallet.");
+    // Debounce to prevent rapid-fire requests
+    const timeoutId = setTimeout(async () => {
+      setLoadingAllocation(true);
+      setClaimError(null);
+      addDebugMessage(`🔍 Checking eligibility for ETH address: ${ethAddress.slice(0, 10)}...`);
+
+      try {
+        // Lookup by ETH address - this is the L1 snapshot
+        const data = await fetchAllocation(ethAddress, starknetAddress || '');
         
-        // ✨ FIX: Reset error after a short delay to allow retry
-        setTimeout(() => {
-          setError(null);
-        }, 3000); // Clear after 3 seconds
-      } else {
-        addDebugMessage(`❌ Connection error: ${connectError.message}`);
-        setError(connectError.message);
+        if (data) {
+          setClaimAmount(data.amount);
+          setClaimProof(data.proof);
+          setIsEligible(true);
+          addDebugMessage(`✅ Eligible! Amount: ${(Number(data.amount) / 1e18).toLocaleString()} tokens`);
+        } else {
+          setIsEligible(false);
+          setClaimError("ETH address not found in snapshot. You may not be eligible for this migration.");
+          addDebugMessage(`❌ Not eligible - address not in snapshot`);
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error loading allocation:", error);
+        }
+        setClaimError("Failed to load allocation data. Please try again.");
+        setIsEligible(false);
+        addDebugMessage(`❌ Error loading allocation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setLoadingAllocation(false);
       }
-    }
-  }, [connectError]);
+    }, 300); // 300ms debounce
 
-  // Log available connectors
+    return () => clearTimeout(timeoutId);
+  }, [ethAddress]); // Only depends on ethAddress now
+
+  // Advance to step 2 when MetaMask connects AND we know eligibility
   useEffect(() => {
-    debug.log("CONNECTORS", "Available connectors", connectors.map(c => ({
-      id: c.id,
-      name: c.name,
-      available: c.available,
-    })));
-  }, [connectors]);
+    if (ethConnected && !loadingAllocation && migrationStep === 1) {
+      setMigrationStep(2);
+      addDebugMessage(`📝 Step 2: Connect Starknet wallet`);
+    }
+  }, [ethConnected, loadingAllocation, migrationStep]);
 
-  const controller = connectors[0] as ControllerConnector;
-  const isEligible = normalizeAddress(address || "") === normalizeAddress(CLAIM_DATA.address);
-
-  // Log eligibility check
+  // Advance to step 3 when Starknet connects AND eligible
   useEffect(() => {
-    if (address) {
-      debug.log("ELIGIBILITY", "Checking eligibility", {
-        connectedAddress: address,
-        expectedAddress: CLAIM_DATA.address,
-        isEligible,
-        addressMatch: address?.toLowerCase() === CLAIM_DATA.address.toLowerCase(),
-      });
-      addDebugMessage(`Eligibility: ${isEligible ? 'YES' : 'NO'} (${address.slice(0,10)}... vs ${CLAIM_DATA.address.slice(0,10)}...)`);
+    if (starknetStatus === 'connected' && isEligible && migrationStep === 2) {
+      setMigrationStep(3);
+      addDebugMessage(`🎯 Step 3: Ready to claim tokens`);
     }
-  }, [address, isEligible]);
+  }, [starknetStatus, isEligible, migrationStep]);
 
-  const handleConnect = useCallback(async () => {
-    debug.log("CONNECT", "Starting connection flow");
-    addDebugMessage("🔐 Creating your Starknet wallet...");
-    
-    // ✨ NEW: Clear previous errors
-    setError(null);
-    
-    try {
-      if (!controller) {
-        debug.error("CONNECT", "Controller connector not found");
-        addDebugMessage("ERROR: Controller not available");
-        setError("Wallet connector not initialized. Please refresh the page.");
-        return;
-      }
-      
-      debug.log("CONNECT", "Controller details", {
-        id: controller.id,
-        name: controller.name,
-        available: controller.available,
-      });
-      
-      debug.log("CONNECT", "Calling connect() - passkey prompt will appear");
-      addDebugMessage("📱 Approve passkey creation (one-time setup)");
-      
-      connect({ connector: controller });
-      
-      debug.success("CONNECT", "connect() initiated - waiting for user approval");
-      
-    } catch (err: any) {
-      debug.error("CONNECT", "Connection failed", {
-        message: err?.message,
-        code: err?.code,
-      });
-      addDebugMessage(`❌ Connection failed: ${err?.message || 'Unknown error'}`);
-      setError(err?.message || 'Failed to connect. Please try again.');
+  // Step 1: Connect MetaMask (signing happens after both wallets connected)
+  // Step 2: Sign message to prove L1 ownership (requires both addresses)
+  const handleSignMigration = () => {
+    if (!ethAddress || !starknetAddress) {
+      setClaimError("Please connect both wallets before signing");
+      return;
     }
-  }, [connect, controller]);
+    
+    const message = createMigrationMessage(ethAddress, starknetAddress);
+    addDebugMessage(`✍️ Requesting signature from MetaMask...`);
+    signMessage({ message });
+  };
+
+  // Step 2: Connect Cartridge Controller
+  const handleConnectController = useCallback(async () => {
+    if (controllerConnector) {
+      addDebugMessage(`🔐 Connecting Cartridge Controller...`);
+      connect({ connector: controllerConnector });
+    }
+  }, [connect, controllerConnector]);
 
   const handleDisconnect = useCallback(async () => {
-    debug.log("DISCONNECT", "Disconnecting wallet");
     addDebugMessage("Disconnecting...");
-    
-    try {
-      await disconnect();
-      debug.success("DISCONNECT", "Disconnected successfully");
-      addDebugMessage("Disconnected");
-      setClaimed(false);
-      setTxHash(null);
-      setError(null);
-      setIsFirstConnection(true); // Reset for next connection
-    } catch (err: any) {
-      debug.error("DISCONNECT", "Disconnect failed", err);
-      addDebugMessage(`Disconnect error: ${err?.message}`);
-    }
+    await disconnect();
+    setTxHash(null);
+    setClaimError(null);
+    setMigrationStep(1);
+    setSignature(null);
+    setIsEligible(false);
+    addDebugMessage("Disconnected");
   }, [disconnect]);
 
-  const handleClaim = useCallback(async () => {
-    debug.log("CLAIM", "=== STARTING CLAIM FLOW ===");
-    addDebugMessage("=== Starting claim ===");
-    
-    if (!account) {
-      debug.error("CLAIM", "No account available");
-      addDebugMessage("ERROR: No account");
+  // Step 3: Claim tokens on Starknet
+  const handleClaim = async () => {
+    // Enhanced guard clause with logging
+    if (!account || !claimAmount || claiming || !isEligible) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Guard failed:", { 
+          account: !!account, 
+          claimAmount, 
+          claiming, 
+          isEligible 
+        });
+      }
+      if (!isEligible) {
+        setClaimError("You are not eligible to claim tokens. Please check your address.");
+      }
       return;
     }
-    
-    if (!isEligible) {
-      debug.error("CLAIM", "Address not eligible");
-      addDebugMessage("ERROR: Not eligible");
-      return;
-    }
+
     setClaiming(true);
-    setError(null);
+    setClaimError(null);
+    addDebugMessage(`🚀 Starting claim transaction...`);
+
     try {
-      // Log account details
-      debug.log("CLAIM", "Account details", {
-        address: account.address,
-        // @ts-ignore - accessing internal properties for debug
-        chainId: account.chainId,
-      });
-      addDebugMessage(`Account: ${account.address.slice(0,20)}...`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Starting claim with:", { 
+          claimAmount, 
+          proofLength: claimProof.length,
+          accountAddress: account.address,
+          portalAddress: PORTAL_ADDRESS
+        });
+      }
 
-      // Prepare calldata with proper u256 serialization
-      const amountBigInt = BigInt(CLAIM_DATA.amount);
-      const LOW_MASK = BigInt("0xffffffffffffffffffffffffffffffff"); // 128-bit mask
-      const amountLow = "0x" + (amountBigInt & LOW_MASK).toString(16);
-      const amountHigh = "0x" + (amountBigInt >> BigInt(128)).toString(16);
-      
-      // Proof serialization: Span<felt252> = (length, ...elements)
-      const proofLength = CLAIM_DATA.proof.length.toString();
-      
-      const calldata = [amountLow, amountHigh, proofLength, ...CLAIM_DATA.proof];
-      
-      debug.log("CLAIM", "Prepared calldata", {
-        amountRaw: CLAIM_DATA.amount,
-        amountLow,
-        amountHigh,
-        proofLength,
-        proof: CLAIM_DATA.proof,
-        fullCalldata: calldata,
-      });
-      addDebugMessage(`Calldata: amount=${amountLow}, proof_len=${proofLength}`);
+      // Convert amount to u256 (low, high)
+      const amount = BigInt(claimAmount);
+      const amountLow = amount & BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+      const amountHigh = amount >> BigInt(128);
 
-      // Prepare transaction
-      const tx = {
+      // Prepare calldata for claim function
+      const calldata = CallData.compile({
+        amount: {
+          low: amountLow.toString(),
+          high: amountHigh.toString(),
+        },
+        proof: claimProof,
+      });
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Executing with calldata:", calldata);
+      }
+
+      // Execute claim transaction
+      const result = await account.execute({
         contractAddress: PORTAL_ADDRESS,
         entrypoint: "claim",
-        calldata,
-      };
-      
-      debug.log("CLAIM", "Transaction object", tx);
-      addDebugMessage(`TX: ${PORTAL_ADDRESS.slice(0,15)}...::claim`);
-
-      // ✨ NEW: Better messaging for session execution
-      debug.log("CLAIM", "Executing with session keys (should be gasless & invisible)");
-      addDebugMessage("🚀 Executing gasless transaction...");
-      
-      const startTime = Date.now();
-      const result = await account.execute([tx]);
-      const duration = Date.now() - startTime;
-      
-      debug.success("CLAIM", "Transaction submitted!", {
-        transaction_hash: result.transaction_hash,
-        duration_ms: duration,
+        calldata: calldata,
       });
-      addDebugMessage(`✅ Submitted in ${duration}ms (gasless!): ${result.transaction_hash.slice(0,20)}...`);
 
-      setTxHash(result.transaction_hash);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Result:", result);
+      }
 
-      // Wait for confirmation
-      debug.log("CLAIM", "Waiting for confirmation...");
-      addDebugMessage("⏳ Confirming transaction...");
-      
-      if (provider) {
-        try {
-          // @ts-ignore - waitForTransaction types vary by provider version
-          const receipt: any = await provider.waitForTransaction(result.transaction_hash);
-          debug.success("CLAIM", "Transaction confirmed!", {
-            transaction_hash: receipt?.transaction_hash || result.transaction_hash,
-            status: receipt?.status || 'success',
-          });
-          addDebugMessage(`✅ Confirmed! Status: ${receipt?.status || 'success'}`);
-        } catch (waitErr: any) {
-          debug.warn("CLAIM", "Could not wait for confirmation (non-fatal)", waitErr?.message);
-          addDebugMessage(`⚠️ Confirmation pending: ${waitErr?.message}`);
+      // Validate result
+      if (result?.transaction_hash) {
+        setTxHash(result.transaction_hash);
+        addDebugMessage(`✅ Transaction submitted: ${result.transaction_hash.slice(0, 20)}...`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("[CLAIM] Success! Transaction hash:", result.transaction_hash);
         }
+      } else {
+        throw new Error("No transaction hash returned from account.execute");
       }
-
-      setClaimed(true);
-      debug.success("CLAIM", "=== CLAIM FLOW COMPLETE ===");
-      addDebugMessage("🎉 Claim complete! Tokens will arrive shortly");
-      
-    } catch (err: any) {
-      debug.error("CLAIM", "Claim failed", {
-        message: err?.message,
-        code: err?.code,
-        data: err?.data,
-        revert_reason: err?.revert_reason,
-        stack: err?.stack,
-      });
-      
-      // Try to extract Starknet error message
-      let errorMsg = err?.message || "Unknown error";
-      if (err?.message?.includes("Error message:")) {
-        errorMsg = err.message.match(/Error message: (.+)/)?.[1] || errorMsg;
-      }
-      if (err?.data?.revert_reason) {
-        errorMsg = err.data.revert_reason;
+    } catch (err: unknown) {
+      // Safe error handling - err might be undefined or not an Error
+      if (process.env.NODE_ENV === 'development') {
+        console.error("[CLAIM] Error:", err);
       }
       
-      addDebugMessage(`CLAIM ERROR: ${errorMsg}`);
-      setError(errorMsg);
+      let errorMessage = "Failed to claim tokens";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+      
+      setClaimError(errorMessage);
+      addDebugMessage(`❌ Claim error: ${errorMessage}`);
     } finally {
       setClaiming(false);
     }
-  }, [account, isEligible, provider]);
+  };
 
   const formatAmount = (raw: string) => {
     try {
@@ -323,219 +258,230 @@ export default function Home() {
     }
   };
 
-  // Render
-  debug.log("RENDER", "Rendering with state", { status, claiming, claimed, hasError: !!error });
-
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6 flex justify-center gap-4">
-          <a
-            href="/migrate"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition"
-          >
-            🚀 New Migration Flow (MetaMask + Controller)
-          </a>
+      <div className="max-w-2xl mx-auto space-y-8">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-2">Token Migration Portal</h1>
+          <p className="text-gray-400">
+            Migrate your tokens from L1 to Starknet
+          </p>
         </div>
-        <h1 className="text-4xl font-bold mb-2 text-center">
-          Token Migration Portal
-        </h1>
-        <p className="text-center text-gray-400 mb-8">
-          Powered by Cartridge Controller
-        </p>
 
-        {/* Connection Status */}
-        <div className="bg-gray-800 rounded-lg p-6 mb-6">
-          {status === "disconnected" ? (
-            <div className="text-center">
-              {/* ✨ NEW: Better onboarding messaging */}
-              <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-900/50 mb-4">
-                  <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Create Your Starknet Wallet</h3>
-                <p className="text-gray-400 text-sm mb-2">
-                  One-time setup with passkey authentication
-                </p>
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                  <span className="inline-flex items-center gap-1">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Gasless claims
-                  </span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    No popups after setup
-                  </span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <svg className="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Secure
-                  </span>
-                </div>
+        {/* Step 1: Connect MetaMask & Sign */}
+        <div
+          className={`p-6 rounded-xl border ${
+            migrationStep >= 1
+              ? "border-blue-500 bg-gray-800"
+              : "border-gray-700 bg-gray-800/50"
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold">
+              1
+            </span>
+            <h2 className="text-xl font-semibold">
+              Connect L1 Wallet & Authorize
+            </h2>
+          </div>
+
+          {!ethConnected ? (
+            <div className="flex justify-center">
+              <ConnectButton />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-gray-700 rounded-lg p-3">
+                <p className="text-sm text-gray-400">Connected (Ethereum/L1)</p>
+                <p className="font-mono text-sm break-all">{ethAddress}</p>
               </div>
-              <button
-                onClick={() => {
-                  setError(null); // Clear previous errors
-                  handleConnect();
-                }}
-                disabled={isConnecting}
-                className={`px-8 py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 ${
-                  isConnecting 
-                    ? "bg-gray-600 cursor-wait" 
-                    : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/50"
-                }`}
-              >
-                {isConnecting ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Connecting...
-                  </span>
-                ) : (
-                  "Connect Controller"
-                )}
-              </button>
-              {/* ✨ NEW: Better error display */}
-              {(connectError || error) && (
-                <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
-                  <p className="text-red-400 text-sm flex items-start gap-2">
-                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    {error || connectError?.message}
+
+              {loadingAllocation && (
+                <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-3">
+                  <p className="text-blue-400 text-sm">Checking eligibility...</p>
+                </div>
+              )}
+
+              {!signature ? (
+                <div className="space-y-2">
+                  {!starknetAddress && (
+                    <p className="text-sm text-yellow-400">
+                      ⚠️ Connect Starknet wallet (Step 2) before signing
+                    </p>
+                  )}
+                  <button
+                    onClick={handleSignMigration}
+                    disabled={isSigning || !starknetAddress || loadingAllocation}
+                    className="w-full py-3 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 rounded-lg font-medium transition"
+                  >
+                    {isSigning 
+                      ? "Sign in MetaMask..." 
+                      : !starknetAddress
+                      ? "Connect Starknet wallet first (Step 2)"
+                      : loadingAllocation
+                      ? "Checking eligibility..."
+                      : "Sign Migration Authorization"}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-green-900/30 border border-green-600 rounded-lg p-3">
+                  <p className="text-green-400 font-medium">
+                    ✓ Migration authorized
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1 break-all">
+                    Signature: {signature.slice(0, 20)}...
                   </p>
                 </div>
               )}
-              <p className="mt-4 text-xs text-gray-500">
-                By connecting, you'll approve a session for gasless token claims
-              </p>
             </div>
-          ) : status === "connecting" ? (
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-900/50 mb-4">
-                <svg className="animate-spin h-8 w-8 text-yellow-400" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
+          )}
+        </div>
+
+        {/* Step 2: Connect Cartridge Controller */}
+        <div
+          className={`p-6 rounded-xl border ${
+            migrationStep >= 2
+              ? "border-purple-500 bg-gray-800"
+              : "border-gray-700 bg-gray-800/50"
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span
+              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                migrationStep >= 2 ? "bg-purple-600" : "bg-gray-600"
+              }`}
+            >
+              2
+            </span>
+            <h2 className="text-xl font-semibold">Connect Starknet Wallet</h2>
+          </div>
+
+          {migrationStep < 2 ? (
+            <p className="text-gray-500">Complete step 1 first</p>
+          ) : starknetStatus !== "connected" ? (
+            <button
+              onClick={handleConnectController}
+              className="w-full py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition"
+            >
+              Connect Controller (Passkey)
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-gray-700 rounded-lg p-3">
+                <p className="text-sm text-gray-400">Connected (Starknet)</p>
+                <p className="font-mono text-sm break-all">{starknetAddress}</p>
               </div>
-              <p className="text-yellow-400 font-semibold">Connecting...</p>
-              <p className="text-gray-500 text-sm mt-2">Check for Cartridge popup or passkey prompt</p>
+              
+              {loadingAllocation && (
+                <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-3">
+                  <p className="text-blue-400 text-sm">Loading allocation data...</p>
+                </div>
+              )}
+              
+              {!loadingAllocation && isEligible && migrationStep === 2 && (
+                <div className="bg-green-900/30 border border-green-600 rounded-lg p-3">
+                  <p className="text-green-400 text-sm">✓ Eligible for migration</p>
+                </div>
+              )}
+              
+              {!loadingAllocation && !isEligible && claimError && (
+                <div className="bg-red-900/30 border border-red-600 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{claimError}</p>
+                </div>
+              )}
+
+              {starknetStatus === "connected" && (
+                <button
+                  onClick={handleDisconnect}
+                  className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Step 3: Claim Tokens */}
+        <div
+          className={`p-6 rounded-xl border ${
+            migrationStep >= 3
+              ? "border-green-500 bg-gray-800"
+              : "border-gray-700 bg-gray-800/50"
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <span
+              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                migrationStep >= 3 ? "bg-green-600" : "bg-gray-600"
+              }`}
+            >
+              3
+            </span>
+            <h2 className="text-xl font-semibold">Claim on Starknet</h2>
+          </div>
+
+          {migrationStep < 3 ? (
+            <p className="text-gray-500">Complete previous steps first</p>
+          ) : !isEligible ? (
+            <div className="space-y-4">
+              <div className="bg-red-900/30 border border-red-600 rounded-lg p-4">
+                <p className="text-red-400 font-medium">Not Eligible</p>
+                <p className="text-sm text-red-300 mt-2">
+                  {claimError || "Your address is not in the migration snapshot."}
+                </p>
+              </div>
             </div>
           ) : (
-            <div>
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm text-gray-400">Connected Wallet:</span>
-                <span className="font-mono text-sm bg-gray-700/50 px-3 py-1 rounded">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </span>
+            <div className="space-y-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <p className="text-gray-400 mb-2">You will receive:</p>
+                <p className="text-3xl font-bold text-green-400">
+                  {claimAmount && claimAmount !== "0" 
+                    ? formatAmount(claimAmount)
+                    : "0"} tokens
+                </p>
               </div>
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-sm text-gray-400">Network:</span>
-                <span className="font-mono text-sm bg-gray-700/50 px-3 py-1 rounded flex items-center gap-2">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                  {chainId?.toString() === "0x534e5f5345504f4c4941" ? "Sepolia" : chainId?.toString() || "unknown"}
-                </span>
-              </div>
+
+              {claimError && (
+                <div className="bg-red-900/30 border border-red-600 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{claimError}</p>
+                </div>
+              )}
+
+              {txHash && (
+                <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-3">
+                  <p className="text-blue-400 text-sm mb-1">
+                    ✓ Transaction submitted!
+                  </p>
+                  <a
+                    href={getStarkscanUrl(txHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-300 text-xs underline break-all"
+                  >
+                    View on Starkscan: {txHash.slice(0, 20)}...
+                  </a>
+                </div>
+              )}
+
               <button
-                onClick={handleDisconnect}
-                className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                onClick={handleClaim}
+                disabled={claiming || !account || !!txHash || !isEligible}
+                className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg font-bold text-lg transition"
               >
-                Disconnect
+                {claiming
+                  ? "Claiming..."
+                  : txHash
+                  ? "Claimed ✓"
+                  : "Claim Tokens"}
               </button>
             </div>
           )}
         </div>
 
-        {/* Claim Section */}
-        {status === "connected" && (
-          <div className="bg-gray-800 rounded-lg p-6 mb-6">
-            {!isEligible ? (
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-900/50 mb-4">
-                  <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <p className="text-yellow-400 mb-2 font-semibold">Not Eligible</p>
-                <p className="text-gray-500 text-xs font-mono mb-1">Connected: {address?.slice(0,10)}...{address?.slice(-8)}</p>
-                <p className="text-gray-500 text-xs font-mono">Expected: {CLAIM_DATA.address.slice(0,10)}...{CLAIM_DATA.address.slice(-8)}</p>
-              </div>
-            ) : claimed ? (
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-900/50 mb-4">
-                  <svg className="w-8 h-8 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <p className="text-2xl font-bold text-green-400 mb-4">✓ Tokens Claimed!</p>
-                {txHash && (
-                  <a
-                    href={explorer?.transaction(txHash) || `https://sepolia.voyager.online/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm transition-colors"
-                  >
-                    View on Explorer 
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-gray-400 mb-2">You are eligible to claim:</p>
-                <p className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 mb-6">
-                  {formatAmount(CLAIM_DATA.amount)} GGMT
-                </p>
-                
-                <button
-                  onClick={handleClaim}
-                  disabled={claiming}
-                  className={`w-full py-4 rounded-lg font-semibold text-lg transition-all transform hover:scale-105 ${
-                    claiming
-                      ? "bg-gray-600 cursor-wait"
-                      : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg shadow-green-500/50"
-                  }`}
-                >
-                  {claiming ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Claiming (Gasless)...
-                    </span>
-                  ) : (
-                    "Claim Tokens"
-                  )}
-                </button>
-                {error && (
-                  <div className="mt-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
-                    <p className="text-red-400 text-sm">{error}</p>
-                  </div>
-                )}
-                <p className="mt-4 text-xs text-gray-500">
-                  ⚡ This transaction is gasless - no fees required
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Enhanced Debug Panel */}
-        <div className="bg-gray-900 border-2 border-gray-700 rounded-lg p-6 mt-6">
+        <div className="bg-gray-900 border-2 border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-gray-300 flex items-center gap-2">
               🔧 Debug Panel
@@ -562,25 +508,45 @@ export default function Home() {
           {/* System State Info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-800 rounded border border-gray-700">
             <div>
-              <div className="text-xs text-gray-500 mb-1">Connection Status</div>
+              <div className="text-xs text-gray-500 mb-1">ETH Status</div>
               <div className={`text-sm font-mono font-bold ${
-                status === "connected" ? "text-green-400" :
-                status === "connecting" ? "text-yellow-400" :
+                ethConnected ? "text-green-400" : "text-red-400"
+              }`}>
+                {ethConnected ? "CONNECTED" : "DISCONNECTED"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Starknet Status</div>
+              <div className={`text-sm font-mono font-bold ${
+                starknetStatus === "connected" ? "text-green-400" :
+                starknetStatus === "connecting" ? "text-yellow-400" :
                 "text-red-400"
               }`}>
-                {status.toUpperCase()}
+                {starknetStatus?.toUpperCase() || "DISCONNECTED"}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-1">Address</div>
+              <div className="text-xs text-gray-500 mb-1">ETH Address</div>
               <div className="text-xs font-mono text-gray-300 break-all">
-                {address || "Not connected"}
+                {ethAddress || "Not connected"}
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-1">Chain ID</div>
-              <div className="text-xs font-mono text-gray-300">
-                {chainId?.toString() || "N/A"}
+              <div className="text-xs text-gray-500 mb-1">Starknet Address</div>
+              <div className="text-xs font-mono text-gray-300 break-all">
+                {starknetAddress || "Not connected"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Signature</div>
+              <div className="text-xs font-mono text-gray-300 break-all">
+                {signature ? `${signature.slice(0, 20)}...` : "Not signed"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Step</div>
+              <div className="text-sm font-bold text-gray-300">
+                {migrationStep}
               </div>
             </div>
             <div>
@@ -592,11 +558,9 @@ export default function Home() {
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-1">Has Account</div>
-              <div className={`text-sm font-bold ${
-                account ? "text-green-400" : "text-red-400"
-              }`}>
-                {account ? "YES" : "NO"}
+              <div className="text-xs text-gray-500 mb-1">Claim Amount</div>
+              <div className="text-xs font-mono text-gray-300">
+                {claimAmount}
               </div>
             </div>
             <div>
@@ -608,17 +572,11 @@ export default function Home() {
               </div>
             </div>
             <div>
-              <div className="text-xs text-gray-500 mb-1">Claimed</div>
+              <div className="text-xs text-gray-500 mb-1">Has Account</div>
               <div className={`text-sm font-bold ${
-                claimed ? "text-green-400" : "text-gray-400"
+                account ? "text-green-400" : "text-red-400"
               }`}>
-                {claimed ? "YES" : "NO"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-1">Connectors</div>
-              <div className="text-xs font-mono text-gray-300">
-                {connectors.length} available
+                {account ? "YES" : "NO"}
               </div>
             </div>
           </div>
@@ -635,22 +593,14 @@ export default function Home() {
                 <span className="text-gray-500">Token:</span>{" "}
                 <span className="text-gray-300 break-all">{TOKEN_ADDRESS}</span>
               </div>
-              <div>
-                <span className="text-gray-500">Expected Address:</span>{" "}
-                <span className="text-gray-300 break-all">{CLAIM_DATA.address}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Claim Amount:</span>{" "}
-                <span className="text-green-400">{CLAIM_DATA.amount}</span>
-              </div>
             </div>
           </div>
 
           {/* Error Display */}
-          {error && (
+          {claimError && (
             <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded">
               <div className="text-xs text-red-400 font-semibold mb-1">❌ Error</div>
-              <div className="text-sm font-mono text-red-300 break-all">{error}</div>
+              <div className="text-sm font-mono text-red-300 break-all">{claimError}</div>
             </div>
           )}
 
@@ -691,13 +641,6 @@ export default function Home() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Contract Info */}
-        <div className="mt-6 text-center text-gray-600 text-xs font-mono">
-          <p>Portal: {PORTAL_ADDRESS}</p>
-          <p>Token: {TOKEN_ADDRESS}</p>
-          <p>Network: Sepolia</p>
         </div>
       </div>
     </main>
