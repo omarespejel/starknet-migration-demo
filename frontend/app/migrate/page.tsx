@@ -58,16 +58,9 @@ export default function MigrationPage() {
   const { connect, connectors } = useConnect();
   const controllerConnector = connectors.find((c) => c.id === "controller");
 
-  // Advance to step 2 when MetaMask connects
+  // Fetch merkle proof when ETH address is available (eligibility based on L1 snapshot)
   useEffect(() => {
-    if (ethConnected && migrationStep === 1) {
-      setMigrationStep(2);
-    }
-  }, [ethConnected, migrationStep]);
-
-  // Fetch merkle proof when both addresses are available (with debounce)
-  useEffect(() => {
-    if (!starknetAddress || migrationStep < 2) return;
+    if (!ethAddress) return;
 
     // Debounce to prevent rapid-fire requests
     const timeoutId = setTimeout(async () => {
@@ -75,19 +68,16 @@ export default function MigrationPage() {
       setClaimError(null);
 
       try {
-        const data = await fetchAllocation(ethAddress || '', starknetAddress);
+        // Lookup by ETH address - this is the L1/IMX snapshot
+        const data = await fetchAllocation(ethAddress, starknetAddress || '');
         
         if (data) {
           setClaimAmount(data.amount);
           setClaimProof(data.proof);
           setIsEligible(true);
-          // Automatically advance to step 3 if eligible
-          if (migrationStep === 2) {
-            setMigrationStep(3);
-          }
         } else {
           setIsEligible(false);
-          setClaimError("Address not found in snapshot. You may not be eligible for this migration.");
+          setClaimError("ETH address not found in snapshot. You may not be eligible for this migration.");
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
@@ -101,7 +91,21 @@ export default function MigrationPage() {
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [ethAddress, starknetAddress, migrationStep]);
+  }, [ethAddress]); // Only depends on ethAddress now
+
+  // Advance to step 2 when MetaMask connects AND we know eligibility
+  useEffect(() => {
+    if (ethConnected && !loadingAllocation && migrationStep === 1) {
+      setMigrationStep(2);
+    }
+  }, [ethConnected, loadingAllocation, migrationStep]);
+
+  // Advance to step 3 when Starknet connects AND eligible
+  useEffect(() => {
+    if (starknetStatus === 'connected' && isEligible && migrationStep === 2) {
+      setMigrationStep(3);
+    }
+  }, [starknetStatus, isEligible, migrationStep]);
 
   // Step 1: Connect MetaMask (signing happens after both wallets connected)
   // Step 2: Sign message to prove IMX ownership (requires both addresses)

@@ -1,4 +1,4 @@
-import { fetchAllocation, normalizeAddress, ClaimData } from '../merkle';
+import { fetchAllocation, normalizeEthAddress } from '../merkle';
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -8,40 +8,32 @@ describe('merkle utilities', () => {
     jest.clearAllMocks();
   });
 
-  describe('normalizeAddress', () => {
-    it('should normalize address to lowercase and pad to 64 chars', () => {
-      const address = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
-      const normalized = normalizeAddress(address);
+  describe('normalizeEthAddress', () => {
+    it('should normalize ETH address to lowercase without 0x', () => {
+      const address = '0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21';
+      const normalized = normalizeEthAddress(address);
       
-      expect(normalized).toBe('042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152');
-      expect(normalized.length).toBe(64);
+      expect(normalized).toBe('742d35cc6634c0532925a3b844bc9e7595f5be21');
+      expect(normalized.length).toBe(40);
     });
 
     it('should handle addresses without 0x prefix', () => {
-      const address = '042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
-      const normalized = normalizeAddress(address);
+      const address = '742d35cc6634c0532925a3b844bc9e7595f5be21';
+      const normalized = normalizeEthAddress(address);
       
-      expect(normalized).toBe('042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152');
+      expect(normalized).toBe('742d35cc6634c0532925a3b844bc9e7595f5be21');
     });
 
     it('should handle uppercase addresses', () => {
-      const address = '0x042465F34CF0E79B2A5CEFBCE4CF11B0D1F56B2E0BB63FB469B3A7EB3FE2A152';
-      const normalized = normalizeAddress(address);
+      const address = '0x742D35CC6634C0532925A3B844BC9E7595F5BE21';
+      const normalized = normalizeEthAddress(address);
       
-      expect(normalized).toBe('042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152');
+      expect(normalized).toBe('742d35cc6634c0532925a3b844bc9e7595f5be21');
     });
 
     it('should handle empty string', () => {
-      const normalized = normalizeAddress('');
+      const normalized = normalizeEthAddress('');
       expect(normalized).toBe('');
-    });
-
-    it('should pad short addresses', () => {
-      const address = '0x123';
-      const normalized = normalizeAddress(address);
-      
-      expect(normalized.length).toBe(64);
-      expect(normalized).toMatch(/^0+123$/);
     });
   });
 
@@ -50,45 +42,44 @@ describe('merkle utilities', () => {
       root: '0x63cf9212cb1ef5748af2fd0d4f1517446068f6e0cc45fb489556e6b6acdc497',
       claims: [
         {
-          address: '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152',
+          address: '0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21',  // ETH address
           amount: '1000000000000000000',
           proof: [],
         },
         {
-          address: '0x53371c2a24c3a9b7fcd60c70405e24e72d17a835e43c53bb465eee6e271044b',
+          address: '0x03c4a74467bee82b6f0374cf9bf540bfc9cd18f2',  // Another ETH address
           amount: '2000000000000000000',
           proof: ['0xabc', '0xdef'],
         },
       ],
     };
 
-    it('should fetch and return allocation for matching address', async () => {
+    it('should fetch and return allocation for matching ETH address', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockMerkleData,
       });
 
-      const ethAddress = '0x123';
+      const ethAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21';
       const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
       const result = await fetchAllocation(ethAddress, starknetAddress);
 
       expect(result).toEqual({
-        address: '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152',
         amount: '1000000000000000000',
         proof: [],
       });
       expect(global.fetch).toHaveBeenCalledWith('/merkle-tree.json');
     });
 
-    it('should return null when address not found', async () => {
+    it('should return null when ETH address not found', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockMerkleData,
       });
 
-      const ethAddress = '0x123';
-      const starknetAddress = '0x9999999999999999999999999999999999999999999999999999999999999999';
+      const ethAddress = '0x9999999999999999999999999999999999999999';
+      const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
       const result = await fetchAllocation(ethAddress, starknetAddress);
 
@@ -98,36 +89,32 @@ describe('merkle utilities', () => {
     it('should handle fetch errors gracefully', async () => {
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
-      const ethAddress = '0x123';
+      const ethAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21';
       const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
-      const result = await fetchAllocation(ethAddress, starknetAddress);
-
-      expect(result).toBeNull();
+      await expect(fetchAllocation(ethAddress, starknetAddress)).rejects.toThrow('Network error');
     });
 
-    it('should return null when response is not ok', async () => {
+    it('should throw error when response is not ok', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: false,
         status: 404,
       });
 
-      const ethAddress = '0x123';
+      const ethAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f5bE21';
       const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
-      const result = await fetchAllocation(ethAddress, starknetAddress);
-
-      expect(result).toBeNull();
+      await expect(fetchAllocation(ethAddress, starknetAddress)).rejects.toThrow();
     });
 
-    it('should match addresses case-insensitively', async () => {
+    it('should match ETH addresses case-insensitively', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockMerkleData,
       });
 
-      const ethAddress = '0x123';
-      const starknetAddress = '0x042465F34CF0E79B2A5CEFBCE4CF11B0D1F56B2E0BB63FB469B3A7EB3FE2A152';
+      const ethAddress = '0x742D35CC6634C0532925A3B844BC9E7595F5BE21';  // Uppercase
+      const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
       const result = await fetchAllocation(ethAddress, starknetAddress);
 
@@ -135,18 +122,19 @@ describe('merkle utilities', () => {
       expect(result?.amount).toBe('1000000000000000000');
     });
 
-    it('should handle addresses without 0x prefix', async () => {
+    it('should handle ETH addresses without 0x prefix', async () => {
       (global.fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: async () => mockMerkleData,
       });
 
-      const ethAddress = '0x123';
-      const starknetAddress = '042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
+      const ethAddress = '742d35cc6634c0532925a3b844bc9e7595f5be21';  // No 0x
+      const starknetAddress = '0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152';
       
       const result = await fetchAllocation(ethAddress, starknetAddress);
 
       expect(result).not.toBeNull();
+      expect(result?.amount).toBe('1000000000000000000');
     });
   });
 });
