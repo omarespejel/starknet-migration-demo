@@ -124,12 +124,35 @@ export default function MigrationPage() {
 
   // Step 3: Claim tokens on Starknet
   const handleClaim = async () => {
-    if (!account || !claimAmount || claiming) return;
+    // Enhanced guard clause with logging
+    if (!account || !claimAmount || claiming || !isEligible) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Guard failed:", { 
+          account: !!account, 
+          claimAmount, 
+          claiming, 
+          isEligible 
+        });
+      }
+      if (!isEligible) {
+        setClaimError("You are not eligible to claim tokens. Please check your address.");
+      }
+      return;
+    }
 
     setClaiming(true);
     setClaimError(null);
 
     try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Starting claim with:", { 
+          claimAmount, 
+          proofLength: claimProof.length,
+          accountAddress: account.address,
+          portalAddress: PORTAL_ADDRESS
+        });
+      }
+
       // Convert amount to u256 (low, high)
       const amount = BigInt(claimAmount);
       const amountLow = amount & BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
@@ -144,6 +167,10 @@ export default function MigrationPage() {
         proof: claimProof,
       });
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log("[CLAIM] Executing with calldata:", calldata);
+      }
+
       // Execute claim transaction
       const result = await account.execute({
         contractAddress: PORTAL_ADDRESS,
@@ -151,15 +178,36 @@ export default function MigrationPage() {
         calldata: calldata,
       });
 
-      setTxHash(result.transaction_hash);
       if (process.env.NODE_ENV === 'development') {
-        console.log("Claim transaction:", result.transaction_hash);
+        console.log("[CLAIM] Result:", result);
       }
-    } catch (err: any) {
+
+      // Validate result
+      if (result?.transaction_hash) {
+        setTxHash(result.transaction_hash);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("[CLAIM] Success! Transaction hash:", result.transaction_hash);
+        }
+      } else {
+        throw new Error("No transaction hash returned from account.execute");
+      }
+    } catch (err: unknown) {
+      // Safe error handling - err might be undefined or not an Error
       if (process.env.NODE_ENV === 'development') {
-        console.error("Claim error:", err);
+        console.error("[CLAIM] Error:", err);
       }
-      setClaimError(err.message || "Failed to claim tokens");
+      
+      let errorMessage = "Failed to claim tokens";
+      
+      if (err instanceof Error) {
+        errorMessage = err.message || errorMessage;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message);
+      }
+      
+      setClaimError(errorMessage);
     } finally {
       setClaiming(false);
     }
@@ -357,7 +405,7 @@ export default function MigrationPage() {
 
               <button
                 onClick={handleClaim}
-                disabled={claiming || !account || !!txHash}
+                disabled={claiming || !account || !!txHash || !isEligible}
                 className="w-full py-4 px-6 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg font-bold text-lg transition"
               >
                 {claiming
