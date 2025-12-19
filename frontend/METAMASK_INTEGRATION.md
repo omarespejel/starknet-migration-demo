@@ -83,7 +83,7 @@ NEXT_PUBLIC_NETWORK=sepolia
 
 ```bash
 cd frontend
-npm run dev
+bun run dev
 ```
 
 Visit:

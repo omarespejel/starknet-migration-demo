@@ -32,6 +32,7 @@ build/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+bun.lockb
 
 # Repomix context files
 context*.xml
@@ -44,3 +45,7 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Starknet deployment configs with secrets
+contracts/snfoundry.toml
+!contracts/snfoundry.example.toml

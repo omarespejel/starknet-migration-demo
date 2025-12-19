@@ -11,11 +11,11 @@ node -v
 # 2. Check packages installed correctly
 echo -e "\n2. Package versions:"
 cd frontend
-npm ls @cartridge/controller @cartridge/connector @starknet-react/core starknet 2>/dev/null | head -10
+bun pm ls @cartridge/controller @cartridge/connector @starknet-react/core starknet 2>/dev/null | head -10 || echo "Note: bun pm ls may not show all packages"
 
 # 3. Build check
 echo -e "\n3. Build test:"
-npm run build 2>&1 | tail -5
+bun run build 2>&1 | tail -5
 
 # 4. Contract connectivity
 echo -e "\n4. Contract check (calling merkle_root):"

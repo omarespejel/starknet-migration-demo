@@ -15,6 +15,6 @@ curl -s -X POST https://starknet-sepolia.public.blastapi.io/rpc/v0_7 \
   | grep -q "result" && echo "✅ Token deployed" || echo "❌ Token not found"
 
 echo -e "\n3. Checking frontend..."
-curl -s http://localhost:3000 2>/dev/null | grep -q "Migration" && echo "✅ Frontend running" || echo "❌ Frontend not running (start with: cd frontend && npm run dev)"
+curl -s http://localhost:3000 2>/dev/null | grep -q "Migration" && echo "✅ Frontend running" || echo "❌ Frontend not running (start with: cd frontend && bun run dev)"
 
 echo -e "\n=== Smoke test complete ==="

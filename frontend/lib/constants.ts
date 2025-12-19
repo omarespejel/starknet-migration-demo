@@ -12,3 +12,14 @@ export const TOKEN_ADDRESS =
 
 export const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "sepolia";
 
+/**
+ * Get Starkscan URL based on network
+ */
+export function getStarkscanUrl(txHash: string, network?: string): string {
+  const net = network || NETWORK;
+  const baseUrl = net === "mainnet" 
+    ? "https://starkscan.co/tx" 
+    : "https://sepolia.starkscan.co/tx";
+  return `${baseUrl}/${txHash}`;
+}
+

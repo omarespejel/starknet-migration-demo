@@ -1,0 +1,5 @@
+[sncast.default]
+account = "fresh-deployer"
+# Use environment variable: export STARKNET_RPC_URL="https://..."
+url = "${STARKNET_RPC_URL}"
+

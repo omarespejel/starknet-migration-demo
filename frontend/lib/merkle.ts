@@ -26,7 +26,7 @@ export async function fetchAllocation(
     // 2. Looks up the allocation in the merkle tree
     // 3. Returns the proof for the Starknet address
     
-    const response = await fetch("/api/merkle-tree.json");
+    const response = await fetch("/merkle-tree.json");
     if (!response.ok) {
       return null;
     }

@@ -2,7 +2,7 @@ services:
   - type: web
     name: starknet-migration-demo
     env: static
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && bun install && bun run build
     staticPublishPath: frontend/out
     envVars:
       - key: NEXT_PUBLIC_PORTAL_ADDRESS

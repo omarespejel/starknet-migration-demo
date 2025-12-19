@@ -1,0 +1,10 @@
+{
+  "root": "0x63cf9212cb1ef5748af2fd0d4f1517446068f6e0cc45fb489556e6b6acdc497",
+  "claims": [
+    {
+      "address": "0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152",
+      "amount": "1000000000000000000",
+      "proof": []
+    }
+  ]
+}

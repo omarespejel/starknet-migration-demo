@@ -78,7 +78,7 @@ describe('merkle utilities', () => {
         amount: '1000000000000000000',
         proof: [],
       });
-      expect(global.fetch).toHaveBeenCalledWith('/api/merkle-tree.json');
+      expect(global.fetch).toHaveBeenCalledWith('/merkle-tree.json');
     });
 
     it('should return null when address not found', async () => {

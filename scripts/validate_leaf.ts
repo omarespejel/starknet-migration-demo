@@ -5,8 +5,8 @@
  * 
  * Usage: 
  *   cd scripts
- *   npm install
- *   npx ts-node validate_leaf.ts
+ *   bun install
+ *   bun ts-node validate_leaf.ts
  */
 
 import { poseidonHashMany } from '@starkware-industries/starkware-utils';

@@ -15,8 +15,10 @@ const normalizeAddress = (addr: string): string => {
 };
 
 // Claim data from merkle tree
+// NOTE: This is for the original Cartridge-only flow
+// The new migration flow (/migrate) uses fetchAllocation() from merkle tree
 const CLAIM_DATA = {
-  address: "0x53371c2a24c3a9b7fcd60c70405e24e72d17a835e43c53bb465eee6e271044b",
+  address: "0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152", // Updated to match merkle tree
   amount: "1000000000000000000", // 1 token (18 decimals)
   proof: [] as string[],
 };

@@ -5,7 +5,8 @@ import { useAccount as useEthAccount, useSignMessage } from "wagmi";
 import { useAccount as useStarknetAccount, useConnect } from "@starknet-react/core";
 import { useState, useEffect } from "react";
 import { CallData } from "starknet";
-import { PORTAL_ADDRESS } from "@/lib/constants";
+import { PORTAL_ADDRESS, getStarkscanUrl } from "@/lib/constants";
+import { fetchAllocation } from "@/lib/merkle";
 
 // Create deterministic message for verification
 const createMigrationMessage = (ethAddress: string, starknetAddress: string) => `
@@ -26,9 +27,17 @@ export default function MigrationPage() {
   const { signMessage, isPending: isSigning } = useSignMessage({
     mutation: {
       onSuccess: (sig) => {
-        console.log("Signature:", sig);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Signature:", sig);
+        }
         setSignature(sig);
-        setMigrationStep(2);
+        // Don't advance step here - let useEffect handle it based on allocation fetch
+      },
+      onError: (error) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Signature error:", error);
+        }
+        setClaimError("Failed to sign message. Please try again.");
       },
     },
   });
@@ -38,49 +47,71 @@ export default function MigrationPage() {
   const { connect, connectors } = useConnect();
   const controllerConnector = connectors.find((c) => c.id === "controller");
 
+  // Advance to step 2 when MetaMask connects
+  useEffect(() => {
+    if (ethConnected && migrationStep === 1) {
+      setMigrationStep(2);
+    }
+  }, [ethConnected, migrationStep]);
+
   // Migration state
   const [signature, setSignature] = useState<string | null>(null);
   const [migrationStep, setMigrationStep] = useState<1 | 2 | 3>(1);
-  const [claimAmount, setClaimAmount] = useState<string>("1000000000000000000"); // 1 token
+  const [claimAmount, setClaimAmount] = useState<string>("0");
   const [claimProof, setClaimProof] = useState<string[]>([]);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [loadingAllocation, setLoadingAllocation] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
 
-  // Fetch merkle proof when both addresses are available
+  // Fetch merkle proof when both addresses are available (with debounce)
   useEffect(() => {
-    if (ethAddress && starknetAddress && migrationStep >= 2) {
-      // In production, this would fetch from your backend/merkle tree
-      // For now, using the updated merkle tree data
-      const merkleData = {
-        address: "0x042465f34cf0e79b2a5cefbce4cf11b0d1f56b2e0bb63fb469b3a7eb3fe2a152",
-        amount: "1000000000000000000",
-        proof: [] as string[],
-      };
-      
-      // Check if the starknet address matches
-      const normalizedStarknet = starknetAddress?.toLowerCase().replace(/^0x/, "").padStart(64, "0");
-      const normalizedMerkle = merkleData.address.toLowerCase().replace(/^0x/, "").padStart(64, "0");
-      
-      if (normalizedStarknet === normalizedMerkle) {
-        setClaimAmount(merkleData.amount);
-        setClaimProof(merkleData.proof);
-        if (migrationStep === 2) {
-          setMigrationStep(3);
+    if (!starknetAddress || migrationStep < 2) return;
+
+    // Debounce to prevent rapid-fire requests
+    const timeoutId = setTimeout(async () => {
+      setLoadingAllocation(true);
+      setClaimError(null);
+
+      try {
+        const data = await fetchAllocation(ethAddress || '', starknetAddress);
+        
+        if (data) {
+          setClaimAmount(data.amount);
+          setClaimProof(data.proof);
+          setIsEligible(true);
+          // Automatically advance to step 3 if eligible
+          if (migrationStep === 2) {
+            setMigrationStep(3);
+          }
+        } else {
+          setIsEligible(false);
+          setClaimError("Address not found in snapshot. You may not be eligible for this migration.");
         }
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error loading allocation:", error);
+        }
+        setClaimError("Failed to load allocation data. Please try again.");
+        setIsEligible(false);
+      } finally {
+        setLoadingAllocation(false);
       }
-    }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
   }, [ethAddress, starknetAddress, migrationStep]);
 
-  // Step 1: Sign message to prove IMX ownership
+  // Step 1: Connect MetaMask (signing happens after both wallets connected)
+  // Step 2: Sign message to prove IMX ownership (requires both addresses)
   const handleSignMigration = () => {
-    if (!ethAddress) return;
+    if (!ethAddress || !starknetAddress) {
+      setClaimError("Please connect both wallets before signing");
+      return;
+    }
     
-    const message = createMigrationMessage(
-      ethAddress,
-      starknetAddress || "0x0" // Will be updated when Starknet connects
-    );
-    
+    const message = createMigrationMessage(ethAddress, starknetAddress);
     signMessage({ message });
   };
 
@@ -121,9 +152,13 @@ export default function MigrationPage() {
       });
 
       setTxHash(result.transaction_hash);
-      console.log("Claim transaction:", result.transaction_hash);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Claim transaction:", result.transaction_hash);
+      }
     } catch (err: any) {
-      console.error("Claim error:", err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Claim error:", err);
+      }
       setClaimError(err.message || "Failed to claim tokens");
     } finally {
       setClaiming(false);
@@ -169,13 +204,24 @@ export default function MigrationPage() {
               </div>
 
               {!signature ? (
-                <button
-                  onClick={handleSignMigration}
-                  disabled={isSigning}
-                  className="w-full py-3 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 rounded-lg font-medium transition"
-                >
-                  {isSigning ? "Sign in MetaMask..." : "Sign Migration Authorization"}
-                </button>
+                <div className="space-y-2">
+                  {!starknetAddress && (
+                    <p className="text-sm text-yellow-400">
+                      ⚠️ Connect Starknet wallet (Step 2) before signing
+                    </p>
+                  )}
+                  <button
+                    onClick={handleSignMigration}
+                    disabled={isSigning || !starknetAddress}
+                    className="w-full py-3 px-6 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 rounded-lg font-medium transition"
+                  >
+                    {isSigning 
+                      ? "Sign in MetaMask..." 
+                      : !starknetAddress
+                      ? "Connect Starknet wallet first (Step 2)"
+                      : "Sign Migration Authorization"}
+                  </button>
+                </div>
               ) : (
                 <div className="bg-green-900/30 border border-green-600 rounded-lg p-3">
                   <p className="text-green-400 font-medium">
@@ -224,13 +270,23 @@ export default function MigrationPage() {
                 <p className="text-sm text-gray-400">Connected (Starknet)</p>
                 <p className="font-mono text-sm break-all">{starknetAddress}</p>
               </div>
-              {migrationStep === 2 && (
-                <button
-                  onClick={() => setMigrationStep(3)}
-                  className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition"
-                >
-                  Continue to Claim
-                </button>
+              
+              {loadingAllocation && (
+                <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-3">
+                  <p className="text-blue-400 text-sm">Loading allocation data...</p>
+                </div>
+              )}
+              
+              {!loadingAllocation && isEligible && migrationStep === 2 && (
+                <div className="bg-green-900/30 border border-green-600 rounded-lg p-3">
+                  <p className="text-green-400 text-sm">✓ Eligible for migration</p>
+                </div>
+              )}
+              
+              {!loadingAllocation && !isEligible && claimError && (
+                <div className="bg-red-900/30 border border-red-600 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{claimError}</p>
+                </div>
               )}
             </div>
           )}
@@ -257,12 +313,23 @@ export default function MigrationPage() {
 
           {migrationStep < 3 ? (
             <p className="text-gray-500">Complete previous steps first</p>
+          ) : !isEligible ? (
+            <div className="space-y-4">
+              <div className="bg-red-900/30 border border-red-600 rounded-lg p-4">
+                <p className="text-red-400 font-medium">Not Eligible</p>
+                <p className="text-sm text-red-300 mt-2">
+                  {claimError || "Your address is not in the migration snapshot."}
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
               <div className="bg-gray-700 rounded-lg p-4">
                 <p className="text-gray-400 mb-2">You will receive:</p>
                 <p className="text-3xl font-bold text-green-400">
-                  {claimAmount ? (Number(claimAmount) / 1e18).toLocaleString() : "0"} GGMT
+                  {claimAmount && claimAmount !== "0" 
+                    ? (Number(claimAmount) / 1e18).toLocaleString() 
+                    : "0"} GGMT
                 </p>
               </div>
 
@@ -278,7 +345,7 @@ export default function MigrationPage() {
                     ✓ Transaction submitted!
                   </p>
                   <a
-                    href={`https://sepolia.starkscan.co/tx/${txHash}`}
+                    href={getStarkscanUrl(txHash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-300 text-xs underline break-all"
