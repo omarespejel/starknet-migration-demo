@@ -1,5 +1,28 @@
 "use client";
 
+/**
+ * Starknet Provider Configuration with Cartridge Controller
+ * 
+ * This component sets up the Starknet React provider with Cartridge Controller integration.
+ * Cartridge Controller is a smart wallet solution that provides three key advantages:
+ * 
+ * 1. Gasless Transactions: Uses session keys to pre-authorize transactions, eliminating
+ *    gas fees for users. The session keys are stored securely in Cartridge's keychain.
+ * 
+ * 2. Passkey Authentication: Instead of seed phrases, users authenticate with WebAuthn
+ *    passkeys (biometrics or hardware security keys). This improves security and UX.
+ * 
+ * 3. Invisible Execution: After initial session approval, transactions matching the
+ *    policy execute automatically without user interaction or popups.
+ * 
+ * How Session Keys Work:
+ * - User connects and approves a session policy (one-time)
+ * - Cartridge generates temporary signing keys for approved contract methods
+ * - These keys are stored in Cartridge's secure keychain
+ * - Future transactions matching the policy use these keys automatically
+ * - No user approval needed, no gas fees charged
+ */
+
 import { sepolia, mainnet } from "@starknet-react/chains";
 import {
   StarknetConfig,
@@ -14,13 +37,21 @@ import { useMemo, useState, useEffect } from "react";
 const PORTAL_ADDRESS = process.env.NEXT_PUBLIC_PORTAL_ADDRESS ||
   "0x027d9db485a394d3aea0c3af6a82b889cb95a833cc4fe36ede8696624f0310fb";
 
-console.log("🔧 [INIT] PORTAL_ADDRESS:", PORTAL_ADDRESS);
-
+/**
+ * Session Policies: Define which contract methods can be called gaslessly
+ * 
+ * When a user connects Cartridge Controller, they approve this policy. The policy
+ * grants permission for the portal contract's `claim` and `get_claimable` methods
+ * to be executed using session keys without user interaction.
+ * 
+ * This is a security feature: users explicitly approve which methods can be called
+ * automatically. Other methods still require explicit user approval.
+ */
 const policies: SessionPolicies = {
   contracts: {
     [PORTAL_ADDRESS]: {
       name: "Token Migration Portal",
-      description: "Claim your migrated GGMT tokens",
+      description: "Claim your migrated tokens",
       methods: [
         {
           name: "Claim Tokens",
@@ -37,12 +68,18 @@ const policies: SessionPolicies = {
   },
 };
 
+/**
+ * RPC Provider Configuration
+ * 
+ * We use Cartridge's public RPC endpoints for Starknet. These endpoints provide
+ * reliable access to the Starknet network and are optimized for Cartridge Controller
+ * integrations.
+ */
 const provider = jsonRpcProvider({
   rpc: (chain) => {
     const url = chain.id === sepolia.id
       ? "https://api.cartridge.gg/x/starknet/sepolia"
       : "https://api.cartridge.gg/x/starknet/mainnet";
-    console.log(`🔧 [RPC] Chain ${chain.id} → ${url}`);
     return { nodeUrl: url };
   },
 });
@@ -51,50 +88,61 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [initError, setInitError] = useState<Error | null>(null);
 
-  // Only create connector on client side
+  /**
+   * Controller Connector Initialization
+   * 
+   * We create the Cartridge Controller connector only on the client side (not during
+   * server-side rendering) because it requires browser APIs like window and indexedDB.
+   * 
+   * Key Configuration Options:
+   * - chains: Supported Starknet networks (Sepolia testnet and mainnet)
+   * - policies: Session policies defining gasless transaction permissions
+   * - url: Cartridge keychain URL where session keys are stored
+   * - redirectUrl: Where to redirect after authentication (production domain)
+   * - signupOptions: Authentication methods (WebAuthn passkeys, social logins)
+   * 
+   * The connector creates an iframe that communicates with Cartridge's keychain service.
+   * This iframe handles authentication, session key management, and transaction signing.
+   */
   const connector = useMemo(() => {
+    // Skip connector creation during server-side rendering
     if (typeof window === "undefined") {
-      console.log("🔧 [INIT] Skipping connector creation on server");
       return null;
     }
     
     try {
-      console.log("🔧 [INIT] Creating ControllerConnector with fixed config...");
-      // Using 'as any' to allow advanced options that may not be in type definitions
-      // but are supported at runtime by Cartridge Controller
       const ctrl = new ControllerConnector({
-        // Network configuration
+        // Network configuration: support both testnet and mainnet
         chains: [
           { rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" },
           { rpcUrl: "https://api.cartridge.gg/x/starknet/mainnet" },
         ],
         defaultChainId: constants.StarknetChainId.SN_SEPOLIA,
         
-        // Session policies for gasless transactions
+        // Session policies: define which methods can be called gaslessly
         policies,
         
-        // ✨ FIXED: Remove lazyload to force immediate iframe mounting
-        // lazyload: true, // ❌ REMOVED - causes initialization failures
-        
-        // ✨ FIXED: Explicitly set keychain URL
+        // Keychain URL: where Cartridge stores session keys and handles authentication
         url: "https://x.cartridge.gg",
         
-        // ✨ Advanced options (may not be in TypeScript types but work at runtime)
-        signupOptions: ["webauthn", "google", "twitter", "github"], // All available authentication methods
-        theme: "dope-wars", // Options: "dope-wars", "cartridge", "degen", "slot"
-        colorMode: "dark", // Options: "dark", "light"
-        // Production redirect URL for Cartridge Controller
+        // Authentication options: WebAuthn passkeys and social logins
+        signupOptions: ["webauthn", "google", "twitter", "github"],
+        
+        // UI customization
+        theme: "dope-wars",
+        colorMode: "dark",
+        
+        // Production redirect URL: where to redirect after authentication
         redirectUrl: process.env.NEXT_PUBLIC_CARTRIDGE_REDIRECT_URL || 
                      (typeof window !== "undefined" ? window.location.origin : undefined),
+        
+        // Error propagation: surface session errors to the application
         propagateSessionErrors: true,
       } as any);
       
-      console.log("✅ [INIT] ControllerConnector created:", ctrl.id);
-      console.log("🔑 [INIT] Keychain URL: https://x.cartridge.gg");
-      console.log("🔑 [INIT] Session policies configured for gasless claims");
       return ctrl;
     } catch (error) {
-      console.error("❌ [INIT] ControllerConnector failed:", error);
+      console.error("[INIT] ControllerConnector failed:", error);
       setInitError(error as Error);
       return null;
     }
