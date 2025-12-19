@@ -215,6 +215,22 @@ npm run dev
 
 Open http://localhost:3000 and connect your wallet to test the claim flow.
 
+## Pre-Deployment Testing
+
+**Always test before deploying to Render:**
+
+```bash
+# Run the pre-commit check script
+./scripts/pre-commit-check.sh
+
+# Or manually test the build
+cd frontend
+npm install
+npm run build
+```
+
+This ensures TypeScript errors are caught before deployment. The build must complete successfully before committing.
+
 ## Deployment
 
 **Quick Start:** See [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) for step-by-step instructions.
