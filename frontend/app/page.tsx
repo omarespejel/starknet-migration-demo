@@ -7,7 +7,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { PORTAL_ADDRESS, getStarkscanUrl } from "@/lib/constants"
 import { fetchAllocation } from "@/lib/merkle"
 
-// ==================== EDUCATIONAL COMPONENTS ====================
+// ==================== COMPONENTS ====================
 
 /**
  * Info box that explains a concept
@@ -22,57 +22,24 @@ function InfoBox({
   type?: "info" | "success" | "warning" | "code"
 }) {
   const colors = {
-    info: "bg-blue-900/30 border-blue-500/50 text-blue-200",
-    success: "bg-green-900/30 border-green-500/50 text-green-200",
-    warning: "bg-yellow-900/30 border-yellow-500/50 text-yellow-200",
-    code: "bg-gray-900/50 border-gray-500/50 text-gray-200",
+    info: "bg-neutral-50 border-neutral-200 text-neutral-900",
+    success: "bg-neutral-50 border-neutral-200 text-neutral-900",
+    warning: "bg-neutral-50 border-neutral-200 text-neutral-900",
+    code: "bg-neutral-900 border-neutral-800 text-neutral-100",
   }
 
   return (
     <div className={`rounded-lg border p-4 ${colors[type]}`}>
-      <div className="flex items-start gap-2">
-        <span className="text-lg">
-          {type === "info" && "💡"}
-          {type === "success" && "✅"}
-          {type === "warning" && "⚠️"}
-          {type === "code" && "🔧"}
-        </span>
-        <div>
-          <h4 className="font-semibold mb-1">{title}</h4>
-          <div className="text-sm opacity-90">{children}</div>
-        </div>
+      <div>
+        <h4 className="font-semibold mb-1 text-sm">{title}</h4>
+        <div className="text-sm text-neutral-600">{children}</div>
       </div>
     </div>
   )
 }
 
 /**
- * Code block with syntax highlighting feel
- */
-function CodeBlock({ 
-  title, 
-  children,
-  language = "typescript"
-}: { 
-  title: string
-  children: string
-  language?: string
-}) {
-  return (
-    <div className="rounded-lg overflow-hidden border border-gray-700">
-      <div className="bg-gray-800 px-4 py-2 text-xs text-gray-400 flex justify-between items-center">
-        <span>{title}</span>
-        <span className="bg-gray-700 px-2 py-0.5 rounded">{language}</span>
-      </div>
-      <pre className="bg-gray-900 p-4 text-sm overflow-x-auto">
-        <code className="text-green-400">{children}</code>
-      </pre>
-    </div>
-  )
-}
-
-/**
- * Step indicator with educational context
+ * Step indicator with context
  */
 function StepHeader({ 
   step, 
@@ -88,16 +55,16 @@ function StepHeader({
   isComplete: boolean
 }) {
   return (
-    <div className={`flex items-center gap-4 mb-4 ${isActive ? "opacity-100" : "opacity-50"}`}>
+    <div className={`flex items-center gap-4 mb-4 ${isActive ? "opacity-100" : "opacity-40"}`}>
       <div className={`
-        w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold
-        ${isComplete ? "bg-green-600" : isActive ? "bg-blue-600" : "bg-gray-700"}
+        w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold
+        ${isComplete ? "bg-black text-white" : isActive ? "bg-black text-white" : "bg-neutral-200 text-neutral-500"}
       `}>
         {isComplete ? "✓" : step}
       </div>
       <div>
-        <h3 className="text-xl font-bold">{title}</h3>
-        <p className="text-gray-400 text-sm">{subtitle}</p>
+        <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+        <p className="text-neutral-600 text-sm">{subtitle}</p>
       </div>
     </div>
   )
@@ -116,15 +83,14 @@ function LiveDataDisplay({
   explanation: string
 }) {
   return (
-    <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+    <div className="bg-neutral-50 rounded-lg p-3 border border-neutral-200">
       <div className="flex justify-between items-start mb-1">
-        <span className="text-gray-400 text-xs uppercase tracking-wider">{label}</span>
-        <span className="text-gray-500 text-xs">ℹ️</span>
+        <span className="text-neutral-500 text-xs uppercase tracking-wider font-medium">{label}</span>
       </div>
-      <div className="font-mono text-sm text-white break-all">
-        {value || <span className="text-gray-500 italic">Not yet available</span>}
+      <div className="font-mono text-sm text-neutral-900 break-all">
+        {value || <span className="text-neutral-400 italic">Not available</span>}
       </div>
-      <div className="text-xs text-gray-500 mt-2">{explanation}</div>
+      <div className="text-xs text-neutral-500 mt-2">{explanation}</div>
     </div>
   )
 }
@@ -149,37 +115,37 @@ function CalldataVisualizer({
   const amountHigh = "0x" + (amountBigInt >> BigInt(128)).toString(16)
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-      <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
-        📦 Transaction Calldata Structure
-        <span className="text-xs font-normal text-gray-500">(What gets sent to Starknet)</span>
+    <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+      <h4 className="text-sm font-semibold text-neutral-100 mb-3">
+        Transaction Calldata Structure
+        <span className="text-xs font-normal text-neutral-400 ml-2">(sent to Starknet contract)</span>
       </h4>
       
       <div className="space-y-3 font-mono text-xs">
         <div className="flex items-start gap-3">
-          <span className="text-blue-400 w-24 shrink-0">amount.low:</span>
-          <span className="text-green-400 break-all">{amountLow}</span>
+          <span className="text-neutral-400 w-24 shrink-0">amount.low:</span>
+          <span className="text-neutral-100 break-all">{amountLow}</span>
         </div>
         <div className="flex items-start gap-3">
-          <span className="text-blue-400 w-24 shrink-0">amount.high:</span>
-          <span className="text-green-400 break-all">{amountHigh}</span>
+          <span className="text-neutral-400 w-24 shrink-0">amount.high:</span>
+          <span className="text-neutral-100 break-all">{amountHigh}</span>
         </div>
         <div className="flex items-start gap-3">
-          <span className="text-blue-400 w-24 shrink-0">proof.length:</span>
-          <span className="text-green-400">{proof.length}</span>
+          <span className="text-neutral-400 w-24 shrink-0">proof.length:</span>
+          <span className="text-neutral-100">{proof.length}</span>
         </div>
         {proof.length > 0 && (
           <div className="flex items-start gap-3">
-            <span className="text-blue-400 w-24 shrink-0">proof[]:</span>
-            <span className="text-green-400 break-all">[{proof.join(", ")}]</span>
+            <span className="text-neutral-400 w-24 shrink-0">proof[]:</span>
+            <span className="text-neutral-100 break-all">[{proof.join(", ")}]</span>
           </div>
         )}
       </div>
 
-      <div className="mt-4 pt-3 border-t border-gray-700">
-        <p className="text-xs text-gray-500">
-          💡 <strong>Why u256 split?</strong> Starknet's felt252 can't hold full u256. 
-          We split into low (bits 0-127) and high (bits 128-255).
+      <div className="mt-4 pt-3 border-t border-neutral-800">
+        <p className="text-xs text-neutral-400">
+          <strong className="text-neutral-300">u256 serialization:</strong> Starknet's felt252 type cannot represent full 256-bit integers. 
+          Values are split into low (bits 0-127) and high (bits 128-255) components.
         </p>
       </div>
     </div>
@@ -191,69 +157,65 @@ function CalldataVisualizer({
  */
 function ArchitectureDiagram({ currentStep }: { currentStep: number }) {
   return (
-    <div className="bg-gray-800/30 rounded-lg p-6 border border-gray-700">
-      <h4 className="text-sm font-semibold text-gray-300 mb-4">🏗️ Migration Architecture</h4>
+    <div className="bg-neutral-50 rounded-lg p-6 border border-neutral-200">
+      <h4 className="text-sm font-semibold text-neutral-900 mb-4">Migration Architecture</h4>
       
       <div className="flex items-center justify-between text-xs">
         {/* L1 Side */}
-        <div className={`text-center p-3 rounded-lg border-2 transition-all ${
-          currentStep === 1 ? "border-blue-500 bg-blue-500/10" : "border-gray-600"
+        <div className={`text-center p-3 rounded-lg border transition-all ${
+          currentStep === 1 ? "border-black bg-neutral-100" : "border-neutral-300"
         }`}>
-          <div className="text-2xl mb-1">🦊</div>
-          <div className="font-semibold">MetaMask</div>
-          <div className="text-gray-500">L1 / IMX</div>
-          <div className="text-gray-400 mt-1">Proves ownership</div>
+          <div className="font-semibold text-neutral-900 mb-1">MetaMask</div>
+          <div className="text-neutral-600">L1 / IMX</div>
+          <div className="text-neutral-500 mt-1 text-xs">Proves ownership</div>
         </div>
 
         {/* Arrow */}
         <div className="flex-1 flex items-center justify-center px-2">
-          <div className={`h-0.5 flex-1 ${currentStep >= 2 ? "bg-green-500" : "bg-gray-600"}`}></div>
-          <div className={`px-2 ${currentStep >= 2 ? "text-green-500" : "text-gray-600"}`}>→</div>
-          <div className={`h-0.5 flex-1 ${currentStep >= 2 ? "bg-green-500" : "bg-gray-600"}`}></div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 2 ? "bg-black" : "bg-neutral-300"}`}></div>
+          <div className={`px-2 ${currentStep >= 2 ? "text-black" : "text-neutral-300"}`}>→</div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 2 ? "bg-black" : "bg-neutral-300"}`}></div>
         </div>
 
         {/* Merkle Tree */}
-        <div className={`text-center p-3 rounded-lg border-2 transition-all ${
-          currentStep === 2 ? "border-blue-500 bg-blue-500/10" : "border-gray-600"
+        <div className={`text-center p-3 rounded-lg border transition-all ${
+          currentStep === 2 ? "border-black bg-neutral-100" : "border-neutral-300"
         }`}>
-          <div className="text-2xl mb-1">🌳</div>
-          <div className="font-semibold">Merkle Tree</div>
-          <div className="text-gray-500">Off-chain</div>
-          <div className="text-gray-400 mt-1">Verifies eligibility</div>
+          <div className="font-semibold text-neutral-900 mb-1">Merkle Tree</div>
+          <div className="text-neutral-600">Off-chain</div>
+          <div className="text-neutral-500 mt-1 text-xs">Verifies eligibility</div>
         </div>
 
         {/* Arrow */}
         <div className="flex-1 flex items-center justify-center px-2">
-          <div className={`h-0.5 flex-1 ${currentStep >= 3 ? "bg-green-500" : "bg-gray-600"}`}></div>
-          <div className={`px-2 ${currentStep >= 3 ? "text-green-500" : "text-gray-600"}`}>→</div>
-          <div className={`h-0.5 flex-1 ${currentStep >= 3 ? "bg-green-500" : "bg-gray-600"}`}></div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 3 ? "bg-black" : "bg-neutral-300"}`}></div>
+          <div className={`px-2 ${currentStep >= 3 ? "text-black" : "text-neutral-300"}`}>→</div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 3 ? "bg-black" : "bg-neutral-300"}`}></div>
         </div>
 
         {/* Cartridge */}
-        <div className={`text-center p-3 rounded-lg border-2 transition-all ${
-          currentStep === 3 ? "border-blue-500 bg-blue-500/10" : "border-gray-600"
+        <div className={`text-center p-3 rounded-lg border transition-all ${
+          currentStep === 3 ? "border-black bg-neutral-100" : "border-neutral-300"
         }`}>
-          <div className="text-2xl mb-1">🎮</div>
-          <div className="font-semibold">Cartridge</div>
-          <div className="text-gray-500">Starknet</div>
-          <div className="text-gray-400 mt-1">Executes gasless</div>
+          <div className="font-semibold text-neutral-900 mb-1">Cartridge</div>
+          <div className="text-neutral-600">Starknet</div>
+          <div className="text-neutral-500 mt-1 text-xs">Executes transaction</div>
         </div>
 
         {/* Arrow */}
         <div className="flex-1 flex items-center justify-center px-2">
-          <div className={`h-0.5 flex-1 ${currentStep >= 4 ? "bg-green-500" : "bg-gray-600"}`}></div>
-          <div className={`px-2 ${currentStep >= 4 ? "text-green-500" : "text-gray-600"}`}>→</div>
-          <div className={`h-0.5 flex-1 ${currentStep >= 4 ? "bg-green-500" : "bg-gray-600"}`}></div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 4 ? "bg-black" : "bg-neutral-300"}`}></div>
+          <div className={`px-2 ${currentStep >= 4 ? "text-black" : "text-neutral-300"}`}>→</div>
+          <div className={`h-0.5 flex-1 ${currentStep >= 4 ? "bg-black" : "bg-neutral-300"}`}></div>
         </div>
 
         {/* Token */}
-        <div className={`text-center p-3 rounded-lg border-2 transition-all ${
-          currentStep === 4 ? "border-green-500 bg-green-500/10" : "border-gray-600"
+        <div className={`text-center p-3 rounded-lg border transition-all ${
+          currentStep === 4 ? "border-black bg-neutral-100" : "border-neutral-300"
         }`}>
-          <div className="text-2xl mb-1">🪙</div>
-          <div className="font-semibold">Tokens</div>
-          <div className="text-gray-500">On Starknet</div>
-          <div className="text-gray-400 mt-1">Minted to user</div>
+          <div className="font-semibold text-neutral-900 mb-1">Tokens</div>
+          <div className="text-neutral-600">On Starknet</div>
+          <div className="text-neutral-500 mt-1 text-xs">Minted to address</div>
         </div>
       </div>
     </div>
@@ -261,31 +223,28 @@ function ArchitectureDiagram({ currentStep }: { currentStep: number }) {
 }
 
 /**
- * Cartridge feature highlight
+ * Cartridge feature information
  */
 function CartridgeFeatures({ isConnected }: { isConnected: boolean }) {
   return (
-    <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 rounded-lg p-4 border border-purple-500/30">
-      <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
-        🎮 Cartridge Controller Features
-        {isConnected && <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Active</span>}
+    <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+      <h4 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+        Cartridge Controller
+        {isConnected && <span className="text-xs bg-black text-white px-2 py-0.5 rounded">Connected</span>}
       </h4>
       
       <div className="grid grid-cols-3 gap-3 text-xs">
-        <div className="bg-black/20 rounded p-2">
-          <div className="text-lg mb-1">⛽</div>
-          <div className="font-semibold text-white">Gasless TX</div>
-          <div className="text-gray-400">No ETH/STRK needed</div>
+        <div className="bg-white rounded p-2 border border-neutral-200">
+          <div className="font-semibold text-neutral-900 mb-1">Gasless Transactions</div>
+          <div className="text-neutral-600">No ETH/STRK required</div>
         </div>
-        <div className="bg-black/20 rounded p-2">
-          <div className="text-lg mb-1">🔐</div>
-          <div className="font-semibold text-white">Passkey Auth</div>
-          <div className="text-gray-400">No seed phrase</div>
+        <div className="bg-white rounded p-2 border border-neutral-200">
+          <div className="font-semibold text-neutral-900 mb-1">Passkey Authentication</div>
+          <div className="text-neutral-600">WebAuthn-based</div>
         </div>
-        <div className="bg-black/20 rounded p-2">
-          <div className="text-lg mb-1">🔑</div>
-          <div className="font-semibold text-white">Session Keys</div>
-          <div className="text-gray-400">Pre-approved TXs</div>
+        <div className="bg-white rounded p-2 border border-neutral-200">
+          <div className="font-semibold text-neutral-900 mb-1">Session Keys</div>
+          <div className="text-neutral-600">Pre-authorized calls</div>
         </div>
       </div>
     </div>
@@ -439,24 +398,24 @@ This signature proves ownership and authorizes the claim.`
   }
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
+    <main className="min-h-screen bg-white text-neutral-900">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border-b border-gray-800">
+      <div className="border-b border-neutral-200">
         <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold mb-2">🚀 Token Migration Demo</h1>
-              <p className="text-gray-400">
-                Learn how to build L1 → Starknet migrations with Cartridge Controller
+          <h1 className="text-3xl font-semibold mb-2">Token Migration Portal</h1>
+              <p className="text-neutral-600">
+                L1 to Starknet migration implementation with Cartridge Controller
               </p>
             </div>
             <a 
               href="https://github.com/omarespejel/starknet-migration-demo" 
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
+              className="bg-black hover:bg-neutral-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
-              📁 View Source Code
+              View Source Code
             </a>
                 </div>
                 </div>
@@ -475,20 +434,20 @@ This signature proves ownership and authorizes the claim.`
           <div className="lg:col-span-2 space-y-6">
             
             {/* Step 1: Connect L1 Wallet */}
-            <div className={`bg-gray-900 rounded-xl p-6 border ${
-              migrationStep === 1 ? "border-blue-500" : migrationStep > 1 ? "border-green-500/30" : "border-gray-800"
+            <div className={`bg-white rounded-lg p-6 border ${
+              migrationStep === 1 ? "border-black" : migrationStep > 1 ? "border-neutral-300" : "border-neutral-200"
             }`}>
               <StepHeader 
                 step={1} 
                 title="Connect L1 Wallet" 
-                subtitle="Prove ownership of your L1/IMX tokens"
+                subtitle="Verify eligibility via merkle tree snapshot"
                 isActive={migrationStep >= 1}
                 isComplete={migrationStep > 1}
               />
               
-              <InfoBox title="Why this step?" type="info">
+              <InfoBox title="Purpose" type="info">
                 The merkle tree snapshot contains L1 (Ethereum/IMX) addresses. 
-                Connecting MetaMask proves you own an address in the snapshot.
+                Connecting MetaMask authenticates ownership of an address in the snapshot.
               </InfoBox>
 
               <div className="mt-4">
@@ -496,26 +455,26 @@ This signature proves ownership and authorizes the claim.`
               <ConnectButton />
                 ) : (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-green-400">
-                      <span>✓</span>
-                      <span>Connected: {ethAddress?.slice(0, 10)}...{ethAddress?.slice(-8)}</span>
+                    <div className="flex items-center gap-2 text-neutral-900">
+                      <span className="text-neutral-600">Connected:</span>
+                      <span className="font-mono text-sm">{ethAddress?.slice(0, 10)}...{ethAddress?.slice(-8)}</span>
               </div>
 
               {loadingAllocation && (
-                      <div className="text-yellow-400 text-sm">⏳ Checking eligibility...</div>
+                      <div className="text-neutral-600 text-sm">Checking eligibility...</div>
                     )}
                     
                     {isEligible === true && (
-                      <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-3">
-                        <div className="text-green-400 font-semibold">✓ Eligible for {formatAmount(claimAmount)} tokens!</div>
-                        <div className="text-xs text-gray-400 mt-1">Your address was found in the merkle tree snapshot.</div>
+                      <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3">
+                        <div className="text-neutral-900 font-semibold">Eligible: {formatAmount(claimAmount)} tokens</div>
+                        <div className="text-xs text-neutral-600 mt-1">Address found in merkle tree snapshot.</div>
                 </div>
               )}
 
                     {isEligible === false && (
-                      <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3">
-                        <div className="text-red-400">✗ Address not in snapshot</div>
-                        <div className="text-xs text-gray-400 mt-1">This ETH address is not eligible for the migration.</div>
+                      <div className="bg-neutral-50 border border-neutral-300 rounded-lg p-3">
+                        <div className="text-neutral-900">Address not in snapshot</div>
+                        <div className="text-xs text-neutral-600 mt-1">This ETH address is not eligible for migration.</div>
                 </div>
               )}
             </div>
@@ -524,20 +483,20 @@ This signature proves ownership and authorizes the claim.`
             </div>
 
             {/* Step 2: Connect Starknet & Sign */}
-            <div className={`bg-gray-900 rounded-xl p-6 border ${
-              migrationStep === 2 ? "border-blue-500" : migrationStep > 2 ? "border-green-500/30" : "border-gray-800"
+            <div className={`bg-white rounded-lg p-6 border ${
+              migrationStep === 2 ? "border-black" : migrationStep > 2 ? "border-neutral-300" : "border-neutral-200"
             }`}>
               <StepHeader 
                 step={2} 
-                title="Connect Starknet & Authorize" 
-                subtitle="Choose destination wallet and sign authorization"
+                title="Connect Starknet Wallet & Authorize" 
+                subtitle="Connect Cartridge Controller and sign authorization message"
                 isActive={migrationStep >= 2}
                 isComplete={migrationStep > 2}
               />
               
-              <InfoBox title="Why Cartridge Controller?" type="info">
-                Cartridge provides <strong>gasless transactions</strong> via session keys. 
-                Users don't need STRK/ETH to claim - the session policy pre-authorizes the claim function.
+              <InfoBox title="Cartridge Controller" type="info">
+                Cartridge Controller enables gasless transactions via session keys. 
+                The session policy pre-authorizes the claim function, eliminating the need for STRK/ETH.
               </InfoBox>
 
               <CartridgeFeatures isConnected={starknetStatus === "connected"} />
@@ -547,33 +506,32 @@ This signature proves ownership and authorizes the claim.`
               <button
                     onClick={() => controllerConnector && connect({ connector: controllerConnector })}
                     disabled={migrationStep < 2}
-                    className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                    className={`w-full py-3 rounded-lg font-medium transition-colors ${
                       migrationStep >= 2 
-                        ? "bg-purple-600 hover:bg-purple-700" 
-                        : "bg-gray-700 cursor-not-allowed"
+                        ? "bg-black hover:bg-neutral-800 text-white" 
+                        : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                     }`}
                   >
-                    🎮 Connect Cartridge Controller
+                    Connect Cartridge Controller
               </button>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 text-green-400">
-                      <span>✓</span>
-                      <span>Starknet: {starknetAddress?.slice(0, 10)}...{starknetAddress?.slice(-8)}</span>
+                    <div className="flex items-center gap-2 text-neutral-900">
+                      <span className="text-neutral-600">Starknet:</span>
+                      <span className="font-mono text-sm">{starknetAddress?.slice(0, 10)}...{starknetAddress?.slice(-8)}</span>
               </div>
               
                     {!signature ? (
                 <button
                         onClick={handleSign}
                         disabled={isSigning}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold"
+                        className="w-full py-3 bg-black hover:bg-neutral-800 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
-                        {isSigning ? "⏳ Sign in MetaMask..." : "✍️ Sign Migration Authorization"}
+                        {isSigning ? "Signing..." : "Sign Migration Authorization"}
                 </button>
                     ) : (
-                      <div className="flex items-center gap-2 text-green-400">
-                        <span>✓</span>
-                        <span>Authorization signed</span>
+                      <div className="flex items-center gap-2 text-neutral-900">
+                        <span className="text-neutral-600">Authorization signed</span>
             </div>
           )}
                   </>
@@ -582,20 +540,20 @@ This signature proves ownership and authorizes the claim.`
             </div>
 
             {/* Step 3: Claim */}
-            <div className={`bg-gray-900 rounded-xl p-6 border ${
-              migrationStep === 3 ? "border-blue-500" : migrationStep > 3 ? "border-green-500/30" : "border-gray-800"
+            <div className={`bg-white rounded-lg p-6 border ${
+              migrationStep === 3 ? "border-black" : migrationStep > 3 ? "border-neutral-300" : "border-neutral-200"
             }`}>
               <StepHeader 
                 step={3} 
                 title="Claim Tokens" 
-                subtitle="Execute the gasless claim transaction"
+                subtitle="Execute claim transaction on Starknet"
                 isActive={migrationStep >= 3}
                 isComplete={migrationStep > 3}
               />
               
-              <InfoBox title="What happens on-chain?" type="code">
-                The Portal contract: 1) Verifies your merkle proof, 2) Marks your address as claimed, 
-                3) Mints tokens to your Starknet address. All in one atomic transaction!
+              <InfoBox title="On-chain execution" type="code">
+                The Portal contract: 1) Verifies merkle proof against stored root, 2) Marks address as claimed, 
+                3) Mints tokens to Starknet address. Executed atomically in a single transaction.
               </InfoBox>
 
               {claimAmount && (
@@ -608,15 +566,15 @@ This signature proves ownership and authorizes the claim.`
 
               <div className="mt-4">
                 {txHash ? (
-                  <div className="bg-green-900/30 border border-green-500/30 rounded-lg p-4">
-                    <div className="text-green-400 font-semibold mb-2">🎉 Tokens Claimed Successfully!</div>
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4">
+                    <div className="text-neutral-900 font-semibold mb-2">Transaction submitted</div>
                   <a
                     href={getStarkscanUrl(txHash)}
                     target="_blank"
                     rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 text-sm underline"
+                      className="text-neutral-600 hover:text-black text-sm underline"
                   >
-                      View transaction on Starkscan →
+                      View on Starkscan
                   </a>
                 </div>
                 ) : (
@@ -624,17 +582,17 @@ This signature proves ownership and authorizes the claim.`
                 <button
                   onClick={handleClaim}
                       disabled={migrationStep < 3 || claiming}
-                      className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                      className={`w-full py-3 rounded-lg font-medium transition-colors ${
                         migrationStep >= 3 && !claiming
-                          ? "bg-green-600 hover:bg-green-700" 
-                          : "bg-gray-700 cursor-not-allowed"
+                          ? "bg-black hover:bg-neutral-800 text-white" 
+                          : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                       }`}
                     >
-                      {claiming ? "⏳ Claiming..." : `🪙 Claim ${formatAmount(claimAmount)} Tokens (Gasless)`}
+                      {claiming ? "Claiming..." : `Claim ${formatAmount(claimAmount)} Tokens`}
                 </button>
                     
                     {claimError && (
-                      <div className="mt-3 bg-red-900/30 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
+                      <div className="mt-3 bg-neutral-50 border border-neutral-300 rounded-lg p-3 text-neutral-900 text-sm">
                         {claimError}
                       </div>
                     )}
@@ -648,90 +606,90 @@ This signature proves ownership and authorizes the claim.`
           <div className="space-y-6">
             
             {/* Live Data Panel */}
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                📊 Live Data
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <div className="bg-white rounded-lg p-6 border border-neutral-200">
+              <h3 className="text-lg font-semibold mb-4 text-neutral-900">
+                Live Data
+                <span className="w-2 h-2 bg-black rounded-full inline-block ml-2"></span>
               </h3>
               
               <div className="space-y-4">
                 <LiveDataDisplay 
                   label="L1 Address"
                   value={ethAddress || null}
-                  explanation="From MetaMask - used for merkle tree lookup"
+                  explanation="MetaMask address used for merkle tree lookup"
                 />
                 <LiveDataDisplay 
                   label="Starknet Address"
                   value={starknetAddress || null}
-                  explanation="From Cartridge - receives the minted tokens"
+                  explanation="Cartridge Controller address receiving minted tokens"
                 />
                 <LiveDataDisplay 
-                  label="Claim Amount (raw)"
+                  label="Claim Amount (wei)"
                   value={claimAmount}
-                  explanation="In wei (10^18) - divide by 10^18 for tokens"
+                  explanation="Raw amount in wei (10^18 wei = 1 token)"
                 />
                 <LiveDataDisplay 
                   label="Proof Length"
                   value={claimProof.length.toString()}
-                  explanation="Merkle proof elements (0 = single-leaf tree)"
+                  explanation="Number of merkle proof elements (0 indicates single-leaf tree)"
                 />
                 <LiveDataDisplay 
                   label="Signature"
                   value={signature ? `${signature.slice(0, 20)}...` : null}
-                  explanation="MetaMask signature authorizing migration"
+                  explanation="EIP-191 signature authorizing migration"
                 />
                 <LiveDataDisplay 
                   label="Transaction Hash"
                   value={txHash ? `${txHash.slice(0, 20)}...` : null}
-                  explanation="Starknet transaction ID after claiming"
+                  explanation="Starknet transaction identifier"
                 />
               </div>
             </div>
 
             {/* Key Concepts */}
-            <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-lg font-semibold mb-4">📚 Key Concepts</h3>
+            <div className="bg-white rounded-lg p-6 border border-neutral-200">
+              <h3 className="text-lg font-semibold mb-4 text-neutral-900">Key Concepts</h3>
               
               <div className="space-y-4 text-sm">
             <div>
-                  <h4 className="font-semibold text-blue-400">Merkle Tree</h4>
-                  <p className="text-gray-400">
-                    A hash tree storing eligible addresses. Only the root is on-chain - 
-                    proofs verify membership without revealing all addresses.
+                  <h4 className="font-semibold text-neutral-900 mb-1">Merkle Tree</h4>
+                  <p className="text-neutral-600">
+                    Cryptographic hash tree storing eligible addresses. Only the root hash is stored on-chain. 
+                    Merkle proofs verify membership without revealing all addresses.
                   </p>
               </div>
                 
             <div>
-                  <h4 className="font-semibold text-purple-400">Session Keys</h4>
-                  <p className="text-gray-400">
-                    Temporary signing keys that pre-approve specific contract calls. 
-                    Enables gasless UX without compromising security.
+                  <h4 className="font-semibold text-neutral-900 mb-1">Session Keys</h4>
+                  <p className="text-neutral-600">
+                    Temporary signing keys that pre-approve specific contract method calls. 
+                    Enables gasless user experience without compromising security.
                   </p>
               </div>
                 
             <div>
-                  <h4 className="font-semibold text-green-400">Dual Wallet</h4>
-                  <p className="text-gray-400">
-                    L1 wallet proves token ownership, Starknet wallet receives tokens. 
-                    Signature links both addresses together.
+                  <h4 className="font-semibold text-neutral-900 mb-1">Dual Wallet Architecture</h4>
+                  <p className="text-neutral-600">
+                    L1 wallet authenticates token ownership, Starknet wallet receives tokens. 
+                    EIP-191 signature cryptographically links both addresses.
                   </p>
               </div>
             </div>
           </div>
 
-            {/* Integration Guide Link */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border border-blue-500/30">
-              <h3 className="text-lg font-semibold mb-2">🛠️ Build Your Own</h3>
-              <p className="text-gray-400 text-sm mb-4">
-                Ready to integrate Cartridge Controller into your project?
+            {/* Documentation Link */}
+            <div className="bg-neutral-50 rounded-lg p-6 border border-neutral-200">
+              <h3 className="text-lg font-semibold mb-2 text-neutral-900">Documentation</h3>
+              <p className="text-neutral-600 text-sm mb-4">
+                Cartridge Controller integration guide and API reference.
               </p>
               <a 
                 href="https://docs.cartridge.gg" 
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold"
+                className="inline-block bg-black hover:bg-neutral-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                View Cartridge Docs →
+                View Cartridge Docs
               </a>
             </div>
           </div>
