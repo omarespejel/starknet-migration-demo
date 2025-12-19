@@ -31,6 +31,19 @@ const nextConfig = {
       config.output.webassemblyModuleFilename = './../static/wasm/[modulehash].wasm';
     }
 
+    // Suppress optional dependency warnings (these are peer dependencies that are optional)
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      '@react-native-async-storage/async-storage': false,
+      'pino-pretty': false,
+    };
+
+    // Ignore optional peer dependencies
+    config.ignoreWarnings = [
+      { module: /@metamask\/sdk/ },
+      { module: /pino/ },
+    ];
+
     return config;
   },
   async headers() {

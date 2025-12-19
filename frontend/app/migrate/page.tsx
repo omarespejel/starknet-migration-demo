@@ -22,6 +22,17 @@ This signature proves ownership and authorizes the claim.
 `.trim();
 
 export default function MigrationPage() {
+  // Migration state - declare ALL state first
+  const [signature, setSignature] = useState<string | null>(null);
+  const [migrationStep, setMigrationStep] = useState<1 | 2 | 3>(1);
+  const [claimAmount, setClaimAmount] = useState<string>("0");
+  const [claimProof, setClaimProof] = useState<string[]>([]);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [loadingAllocation, setLoadingAllocation] = useState(false);
+  const [isEligible, setIsEligible] = useState(false);
+
   // Ethereum/MetaMask state
   const { address: ethAddress, isConnected: ethConnected } = useEthAccount();
   const { signMessage, isPending: isSigning } = useSignMessage({
@@ -53,17 +64,6 @@ export default function MigrationPage() {
       setMigrationStep(2);
     }
   }, [ethConnected, migrationStep]);
-
-  // Migration state
-  const [signature, setSignature] = useState<string | null>(null);
-  const [migrationStep, setMigrationStep] = useState<1 | 2 | 3>(1);
-  const [claimAmount, setClaimAmount] = useState<string>("0");
-  const [claimProof, setClaimProof] = useState<string[]>([]);
-  const [claiming, setClaiming] = useState(false);
-  const [claimError, setClaimError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [loadingAllocation, setLoadingAllocation] = useState(false);
-  const [isEligible, setIsEligible] = useState(false);
 
   // Fetch merkle proof when both addresses are available (with debounce)
   useEffect(() => {
