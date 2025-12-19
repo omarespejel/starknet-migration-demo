@@ -327,6 +327,14 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white p-8">
       <div className="max-w-2xl mx-auto">
+        <div className="mb-6 flex justify-center gap-4">
+          <a
+            href="/migrate"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition"
+          >
+            🚀 New Migration Flow (MetaMask + Controller)
+          </a>
+        </div>
         <h1 className="text-4xl font-bold mb-2 text-center">
           Token Migration Portal
         </h1>
